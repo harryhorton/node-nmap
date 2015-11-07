@@ -10,24 +10,12 @@ var child_process = require('child_process'),
     exec = require('child_process').exec,
     fs = require('fs'),
     spawn = require("child_process").spawn,
-    colors = require('colors/safe'),
     xml2js = require('xml2js');
 
 //directories
 var nmapLocation = ".\\3rdparty\\nmap\\nmap.exe";
 //var nmapLocation = "nmap.exe";
 
-function log(type, text, data) {
-    if (type === 'info') {
-        console.log(colors.green(text + ' ' + data));
-    } else if (type === 'data') {
-        console.log(colors.grey(text + ' ' + data));
-    } else if (type === 'debug') {
-        console.log(colors.grey(text + ' ' + data));
-    } else if (type === 'error') {
-        console.log(colors.grey(text + ' ' + data));
-    }
-}
 
 
 /*
@@ -37,8 +25,6 @@ function log(type, text, data) {
 *
 */
 function hostsXmlToJson(input) {
-  log('data', input);
-    log('info', 'nmap.js:  hostsCleaup() called: input: ', input);
     var raw = input,
         tempHost = [];
 
@@ -69,7 +55,7 @@ function hostsXmlToJson(input) {
                 tempHost[i].mac = raw[i]["address"][j]["$"]["addr"];
             } else {
                 //If this error shows.  Add the address type found
-                log('error',"addresstype unknown." + raw[i]["address"][j]["$"]["addrtype"]);
+                
             }
         }
         //check if port list is available
@@ -114,7 +100,8 @@ function getHosts(range, callback) {
     }else{
       command = standardArgs.concat(range.split(' '));
     }
-    log('info', 'nmap.js: getHosts() called', command);
+   
+ 
      nmap(command, callback);
 
 };
@@ -128,7 +115,7 @@ if(Array.isArray(range)){
 }else{
   command = standardArgs.concat(range.split(' '));
 }
-log('info', 'nmap.js: osDetection() called', range);
+
  nmap(command, callback);
 
 }
@@ -141,7 +128,7 @@ log('info', 'nmap.js: osDetection() called', range);
 *   @returns:  Array of Json Hosts to callback
 */
 function nmap(command, callback) {
-    log('info', 'nmap.js: nmap() called: ', command);
+   
     var nmapoutputXML ='';
     var nmapOutputJSON;
     var cleanOutputJSON;
@@ -154,19 +141,19 @@ function nmap(command, callback) {
     });
 
     child.stderr.on("data", function (err) {
-        log('error',"nmap.js: nmap():child.stderr.on(data) returned error: " + err);
+        
     });
 
     child.on("close", NMAPRequestDoneHandler);
 
     //Handler for data once connection is closed.
     function NMAPRequestDoneHandler(code) {
-        log('info', 'nmap.js: nmap(): NMAPRequestDoneHandler() called', "");
+        
 
         //turn NMAP's xml output into a json object
         xml2js.parseString(nmapoutputXML, function (err, result) {
             if (err) {
-                log('error',"nmap.js: nmap(): NMAPRequestDoneHandler(): xml2js error:",err);
+                
             }
             nmapOutputJSON = result;
         });
