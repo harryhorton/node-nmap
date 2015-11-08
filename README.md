@@ -9,7 +9,7 @@ NPM package enabling your [NodeJs] application to interface with the features of
 * discoverHosts - Scans supplied hosts without portscan(-sn).  Use for a quick discovery.
 ## Usage
 ```javascript
-var nmap = require();
+var nmap = require('node-nmap');
 
 /*
 *    Accepts array or comma separated string of NMAP acceptable hosts
