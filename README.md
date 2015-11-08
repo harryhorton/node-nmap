@@ -13,6 +13,7 @@ Request:  While runNmap() will accept valid NMAP arguments, the XML to JSON conv
 * runNmap - This is the core of the package and runs the NMAP command.
 * quickScan - Scans supplied hosts without portscan(-sn).  Use for a quick discovery.
 * osAndPortScan - Scans for open ports as well as NMAP gathered OS information.
+* autoDiscover  - scans as a /24 network range for the local network.  \[only /24 currently, and only finds first interface\]
 
 ## Usage
 
@@ -103,6 +104,12 @@ nmap.osAndPortScan('google.com', function(returnData){
 //       "osNmap":"OpenBSD 4.3"
 //    }
 // ]
+nmap.autoDiscover(function(data){
+  console.log(data);
+},function(err){
+  console.log(err);
+});
+
 ```
 
 [NMAP]: <https://nmap.org/>

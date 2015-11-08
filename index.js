@@ -10,7 +10,8 @@ var child_process = require('child_process'),
     exec = require('child_process').exec,
     fs = require('fs'),
     spawn = require("child_process").spawn,
-    xml2js = require('xml2js');
+    xml2js = require('xml2js'),
+    os = require('os');
 
 var nmapLocation = "nmap";
 
@@ -99,7 +100,7 @@ function quickScan(range, onSuccess, onFailure) {
     } else {
         command = standardArgs.concat(range.split(' '));
     }
-
+    console.log(command);
     runNMAP(command, onSuccess, onFailure);
 
 };
@@ -145,7 +146,7 @@ function runNMAP(inputCommand, onSuccess, onFailure) {
     process.on('uncaughtException', function (err) {
         child.kill();
     });
-    process.on('exit',function(){
+    process.on('exit', function () {
         child.kill();
     });
     child.stdout.on("data", function (data) {
@@ -185,6 +186,27 @@ function runNMAP(inputCommand, onSuccess, onFailure) {
 
 }
 
+function autoDiscover(onSuccess, onFailure) {
+    var interfaces = os.networkInterfaces();
+    var addresses = [];
+    for (var k in interfaces) {
+        for (var k2 in interfaces[k]) {
+            var address = interfaces[k][k2];
+            if (address.family === 'IPv4' && !address.internal) {
+                addresses.push(address.address);
+            }
+        }
+    }
+    var ip = addresses[0];
+    var octets = ip.split('.');
+    octets.pop();
+    octets = octets.concat('1-254');
+    var range = octets.join('.');
+    console.log(range);
+    quickScan(range, onSuccess, onFailure);
+    
+}
+
 
 module.exports = function () {
     return {
@@ -195,7 +217,8 @@ module.exports = function () {
             return nmapLocation;
         },
         osAndPortScan: scanWithPortAndOS,
-        quickScan: quickScan
+        quickScan: quickScan,
+        autoDiscover:autoDiscover
 
     };
 } ();
