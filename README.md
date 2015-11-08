@@ -1,7 +1,7 @@
 # Node-NMAP
 NPM package enabling your [NodeJs] application to interface with the features of [NMAP].  This package requires that [NMAP] is installed and available to the running node application.
 
-Warning:  Occasionally NMAP will freeze when the application is stopped before a compelte scan.
+Warning:  Occasionally NMAP will freeze when the application is stopped before a complete scan.
 
 ## Installation
 `npm install node-nmap`
