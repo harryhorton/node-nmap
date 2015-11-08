@@ -12,11 +12,7 @@ var child_process = require('child_process'),
     spawn = require("child_process").spawn,
     xml2js = require('xml2js');
 
-//directories
-var nmapLocation = ".\\3rdparty\\nmap\\nmap.exe";
-//var nmapLocation = "nmap.exe";
-
-
+var nmapLocation = "nmap.exe";
 
 /*
 *   @desc: converts NMAP XML output to an array of JSON Host objects.
@@ -24,64 +20,60 @@ var nmapLocation = ".\\3rdparty\\nmap\\nmap.exe";
 *   @return: Array of Host Objects;
 *
 */
-function hostsXmlToJson(input) {
-    var raw = input,
-        tempHost = [];
-
-    //Removes everything but the host array.
-    raw = raw['nmaprun']['host'];
+function convertXMLtoJSON(xmlInput) {
+    var tempHostList = [];
+    xmlInput = xmlInput['nmaprun']['host'];
 
     //Create a new object for each host found
-    for (var i = 0; i < raw.length; i++) {
+    for (var hostLoopIter = 0; hostLoopIter < xmlInput.length; hostLoopIter++) {
 
         //create the temphost object for each host.
-        tempHost[i] = {
+        tempHostList[hostLoopIter] = {
             hostname: null,
             ip: null,
             mac: null,
             openPorts: []
         };
-        //Check if the hostname is avaialble.  \r\n is what will return if non available.
-        if (raw[i]['hostnames'][0] !== "\r\n") {
-            tempHost[i].hostname = raw[i]['hostnames'][0]['hostname'][0]['$']['name'];
+        //Check if the hostname is avaialble.  \r\n is what will return if not available.
+        if (xmlInput[hostLoopIter]['hostnames'][0] !== "\r\n") {
+            tempHostList[hostLoopIter].hostname = xmlInput[hostLoopIter]['hostnames'][0]['hostname'][0]['$']['name'];
         }
         //For each network address type found
-        for (var j = 0; j < raw[i]["address"].length; j++) {
+        for (var addressLoopIter = 0; addressLoopIter < xmlInput[hostLoopIter]["address"].length; addressLoopIter++) {
 
             //If IPv4, Mac, or unknown.  Get the type and add it or log the type found.
-            if (raw[i]["address"][j]["$"]["addrtype"] === 'ipv4') {
-                tempHost[i].ip = raw[i]["address"][j]["$"]["addr"];
-            } else if (raw[i]["address"][j]["$"]["addrtype"] === 'mac') {
-                tempHost[i].mac = raw[i]["address"][j]["$"]["addr"];
+            if (xmlInput[hostLoopIter]["address"][addressLoopIter]["$"]["addrtype"] === 'ipv4') {
+                tempHostList[hostLoopIter].ip = xmlInput[hostLoopIter]["address"][addressLoopIter]["$"]["addr"];
+            } else if (xmlInput[hostLoopIter]["address"][addressLoopIter]["$"]["addrtype"] === 'mac') {
+                tempHostList[hostLoopIter].mac = xmlInput[hostLoopIter]["address"][addressLoopIter]["$"]["addr"];
             } else {
-                //If this error shows.  Add the address type found
-                
+
             }
         }
         //check if port list is available
-        if (raw[i]["ports"] && raw[i]["ports"][0]["port"]) {
+        if (xmlInput[hostLoopIter]["ports"] && xmlInput[hostLoopIter]["ports"][0]["port"]) {
 
-           //for each port scanned
-           for (var k = 0; k < raw[i]["ports"][0]["port"].length; k++) {
+            //for each port scanned
+            for (var portLoopIter = 0; portLoopIter < xmlInput[hostLoopIter]["ports"][0]["port"].length; portLoopIter++) {
 
-               //if the state of the port is open
-               if (raw[i]["ports"][0]["port"][k]['state'][0]['$']['state'] === 'open') {
-                   tempHost[i].openPorts[k] = {};
-                   //Get the port number
-                   tempHost[i].openPorts[k].port = raw[i]["ports"][0]["port"][k]['$']['portid'];
-                   //Get the port name
-                   tempHost[i].openPorts[k].service = raw[i]["ports"][0]["port"][k]['service'][0]['$']['name'];
-               }
-           }
+                //if the state of the port is open
+                if (xmlInput[hostLoopIter]["ports"][0]["port"][portLoopIter]['state'][0]['$']['state'] === 'open') {
+                    tempHostList[hostLoopIter].openPorts[portLoopIter] = {};
+                    //Get the port number
+                    tempHostList[hostLoopIter].openPorts[portLoopIter].port = xmlInput[hostLoopIter]["ports"][0]["port"][portLoopIter]['$']['portid'];
+                    //Get the port name
+                    tempHostList[hostLoopIter].openPorts[portLoopIter].service = xmlInput[hostLoopIter]["ports"][0]["port"][portLoopIter]['service'][0]['$']['name'];
+                }
+            }
         }
-        if(raw[i].os && raw[i].os[0].osmatch && raw[i].os[0].osmatch[0].$.name){
-          tempHost[i].osNmap = raw[i].os[0].osmatch[0].$.name
-        }else{
-          tempHost[i].osNmap = null;
+        if (xmlInput[hostLoopIter].os && xmlInput[hostLoopIter].os[0].osmatch && xmlInput[hostLoopIter].os[0].osmatch[0].$.name) {
+            tempHostList[hostLoopIter].osNmap = xmlInput[hostLoopIter].os[0].osmatch[0].$.name
+        } else {
+            tempHostList[hostLoopIter].osNmap = null;
         }
 
     };
-    return tempHost
+    return tempHostList
 }
 
 
@@ -92,31 +84,30 @@ function hostsXmlToJson(input) {
 *            function:  callback
 *   @return: Array: List of JSON hosts
 */
-function getHosts(range, callback) {
-    var standardArgs = ['-oX', '-', '-sn',"--system-dns"];
+function scanForHosts(range, callback) {
+    var standardArgs = ['-sn', "--system-dns"];
     var command;
-    if(Array.isArray(range)){
-      command = standardArgs.concat(range);
-    }else{
-      command = standardArgs.concat(range.split(' '));
+    if (Array.isArray(range)) {
+        command = standardArgs.concat(range);
+    } else {
+        command = standardArgs.concat(range.split(' '));
     }
-   
- 
-     nmap(command, callback);
+
+    runNMAP(command, callback);
 
 };
 
-function osDetectionAndPortScan(range, callback){
-//--osscan-guess or -O
-var standardArgs = ['-oX', '-',"--system-dns", "-O"];
-var command;
-if(Array.isArray(range)){
-  command = standardArgs.concat(range);
-}else{
-  command = standardArgs.concat(range.split(' '));
-}
+function scanWithPortAndOS(range, callback) {
+    //--osscan-guess or -O
+    var standardArgs = ["-O"];
+    var command;
+    if (Array.isArray(range)) {
+        command = standardArgs.concat(range);
+    } else {
+        command = standardArgs.concat(range.split(' '));
+    }
 
- nmap(command, callback);
+    runNMAP(command, callback);
 
 }
 
@@ -127,21 +118,26 @@ if(Array.isArray(range)){
 *             ['-oX', '-', '-sn',"--system-dns","192.168.1.1-254"]
 *   @returns:  Array of Json Hosts to callback
 */
-function nmap(command, callback) {
-   
-    var nmapoutputXML ='';
+function runNMAP(inputCommand, callback) {
+    var standardArguments = ['-oX', '-'];
+    var command = [];
+    var nmapoutputXML = '';
     var nmapOutputJSON;
     var cleanOutputJSON;
-
-
+    
+    if (!Array.isArray(inputCommand)) {
+        inputCommand = inputCommand.split(' ');
+    }
+    command = command.concat(standardArguments);
+    command = command.concat(inputCommand);
     var child = spawn(nmapLocation, command);
-
+    
     child.stdout.on("data", function (data) {
         nmapoutputXML += data;
     });
 
     child.stderr.on("data", function (err) {
-        
+
     });
 
     child.on("close", NMAPRequestDoneHandler);
@@ -153,13 +149,12 @@ function nmap(command, callback) {
         //turn NMAP's xml output into a json object
         xml2js.parseString(nmapoutputXML, function (err, result) {
             if (err) {
-                
+
             }
             nmapOutputJSON = result;
         });
         //hostsCleaup removes the unwanted variables from the json data
-        cleanOutputJSON = hostsXmlToJson(nmapOutputJSON);
-
+        cleanOutputJSON = convertXMLtoJSON(nmapOutputJSON);
         callback(cleanOutputJSON);
     }
 
@@ -169,13 +164,14 @@ function nmap(command, callback) {
 
 module.exports = function () {
     return {
-        getNmapLocation: nmapLocation,
+        NmapLocation: nmapLocation,
+        runNMAP: runNMAP,
         setNmapLocation: function (location) {
             nmapLocation = location;
             return nmapLocation;
         },
-        osDetectionAndPortScan: osDetectionAndPortScan,
-        getHosts: getHosts
+        osDetectionAndPortScan: scanWithPortAndOS,
+        scanForHosts: scanForHosts
 
     };
-}();
+} ();

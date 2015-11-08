@@ -4,7 +4,7 @@
   "description": "Interfaces with locally installed NMAP",
   "main": "index.js",
   "scripts": {
-    "test": "test.js"
+    "test": "./node_modules/.bin/mocha --reporter spec"
   },
   "repository": {
     "type": "git",
