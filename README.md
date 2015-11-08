@@ -6,7 +6,9 @@ NPM package enabling your [NodeJs] application to interface with the features of
 
 ## Methods
 * runNmap - This is the core of the package and runs the NMAP command.
-* discoverHosts - Scans supplied hosts without portscan(-sn).  Use for a quick discovery.
+* discoverHosts - Scans supplied hosts without portscan(-sn).  Use for a quick discovery
+
+
 ## Usage
 ```javascript
 var nmap = require('node-nmap');
