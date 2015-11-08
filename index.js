@@ -100,7 +100,6 @@ function quickScan(range, onSuccess, onFailure) {
     } else {
         command = standardArgs.concat(range.split(' '));
     }
-    console.log(command);
     runNMAP(command, onSuccess, onFailure);
 
 };
@@ -202,7 +201,6 @@ function autoDiscover(onSuccess, onFailure) {
     octets.pop();
     octets = octets.concat('1-254');
     var range = octets.join('.');
-    console.log(range);
     quickScan(range, onSuccess, onFailure);
     
 }
