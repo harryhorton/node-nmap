@@ -1,3 +1,4 @@
+[![Stories in Ready](https://badge.waffle.io/Johnhhorton/node-nmap.png?label=ready&title=Ready)](https://waffle.io/Johnhhorton/node-nmap)
 # Node-NMAP
 NPM package enabling your [NodeJs] application to interface with the features of [NMAP].  This package requires that [NMAP] is installed and available to the running node application.
 
