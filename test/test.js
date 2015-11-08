@@ -42,10 +42,10 @@ describe('runNMAP', function () {
   });
 
 });
-describe('scanForHosts', function () {
+describe('discoverHosts', function () {
   it('scans range of hosts', function (done) {
     this.timeout(10000);
-    nmap.runNMAP("-sn 127.0.0.1 google.com", function(data){
+    nmap.discoverHosts("127.0.0.1 google.com", function(data){
       NMAPData = data;
       expect(data).to.be.instanceOf(Array);
       expect(data).to.not.be.empty;
