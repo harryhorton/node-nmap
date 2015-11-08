@@ -84,7 +84,7 @@ function convertXMLtoJSON(xmlInput) {
 *            function:  callback
 *   @return: Array: List of JSON hosts
 */
-function discoverHosts(range, callback) {
+function quickScan(range, callback) {
     var standardArgs = ['-sn', "--system-dns"];
     var command;
     if (Array.isArray(range)) {
@@ -171,7 +171,7 @@ module.exports = function () {
             return nmapLocation;
         },
         osDetectionAndPortScan: scanWithPortAndOS,
-        discoverHosts: discoverHosts
+        quickScan: quickScan
 
     };
 } ();
