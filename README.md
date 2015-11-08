@@ -7,7 +7,7 @@ NPM package enabling your [NodeJs] application to interface with the features of
 ## Methods
 * runNmap - This is the core of the package and runs the NMAP command.
 * quickScan - Scans supplied hosts without portscan(-sn).  Use for a quick discovery.
-
+* osAndPortScan - Scans for open ports as well as NMAP gathered OS information.
 
 ## Usage
 ```javascript
