@@ -20,7 +20,7 @@ runNmap is the core function of the package, which accepts a command, success ca
 All other commands accept onSuccess and onFailure functions as the last 2 parameters passing either the data, or error.
 
 ```javascript
-var nmap = require('./index');
+var nmap = require('node-nmap');
 
 //    Accepts array or comma separated string of NMAP acceptable hosts
 nmap.quickScan('127.0.0.1 google.com', function(returnData){
