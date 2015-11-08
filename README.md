@@ -12,6 +12,10 @@ Warning:  Occasionally NMAP will freeze when the application is stopped before a
 * osAndPortScan - Scans for open ports as well as NMAP gathered OS information.
 
 ## Usage
+
+runNmap is the core function of the package, which accepts a command, success callback, and failure callback.
+All other commands accept onSuccess and onFailure functions as the last 2 parameters passing either the data, or error.
+
 ```javascript
 var nmap = require('node-nmap');
 

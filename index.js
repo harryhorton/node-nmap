@@ -12,7 +12,7 @@ var child_process = require('child_process'),
     spawn = require("child_process").spawn,
     xml2js = require('xml2js');
 
-var nmapLocation = "nmap.exe";
+var nmapLocation = "nmap";
 
 /*
 *   @desc: converts NMAP XML output to an array of JSON Host objects.
@@ -20,8 +20,12 @@ var nmapLocation = "nmap.exe";
 *   @return: Array of Host Objects;
 *
 */
-function convertXMLtoJSON(xmlInput) {
+function convertXMLtoJSON(xmlInput, onFailure) {
     var tempHostList = [];
+    if(!xmlInput['nmaprun']['host']){
+        onFailure("There was a problem with the supplied NMAP XML");
+        return tempHostList;
+    };
     xmlInput = xmlInput['nmaprun']['host'];
 
     //Create a new object for each host found
@@ -74,7 +78,9 @@ function convertXMLtoJSON(xmlInput) {
         }
 
     };
-    return tempHostList
+
+    return tempHostList;
+
 }
 
 
@@ -85,7 +91,7 @@ function convertXMLtoJSON(xmlInput) {
 *            function:  callback
 *   @return: Array: List of JSON hosts
 */
-function quickScan(range, callback) {
+function quickScan(range, onSuccess, onFailure) {
     var standardArgs = ['-sn', "--system-dns"];
     var command;
     if (Array.isArray(range)) {
@@ -94,11 +100,11 @@ function quickScan(range, callback) {
         command = standardArgs.concat(range.split(' '));
     }
 
-    runNMAP(command, callback);
+    runNMAP(command, onSuccess, onFailure);
 
 };
 
-function scanWithPortAndOS(range, callback) {
+function scanWithPortAndOS(range, onSuccess, onFailure) {
     //--osscan-guess or -O
     var standardArgs = ["-O"];
     var command;
@@ -108,7 +114,7 @@ function scanWithPortAndOS(range, callback) {
         command = standardArgs.concat(range.split(' '));
     }
 
-    runNMAP(command, callback);
+    runNMAP(command, onSuccess, onFailure);
 }
 
 /*
@@ -118,7 +124,7 @@ function scanWithPortAndOS(range, callback) {
 *             ['-oX', '-', '-sn',"--system-dns","192.168.1.1-254"]
 *   @returns:  Array of Json Hosts to callback
 */
-function runNMAP(inputCommand, callback) {
+function runNMAP(inputCommand, onSuccess, onFailure) {
     var standardArguments = ['-oX', '-'];
     var command = [];
     var nmapoutputXML = '';
@@ -130,6 +136,8 @@ function runNMAP(inputCommand, callback) {
     }
     command = command.concat(standardArguments);
     command = command.concat(inputCommand);
+
+    var error = null;
     var child = spawn(nmapLocation, command);
 
     child.stdout.on("data", function (data) {
@@ -137,29 +145,36 @@ function runNMAP(inputCommand, callback) {
     });
 
     child.stderr.on("data", function (err) {
-
+        error = err.toString();
     });
 
-    child.on("close", NMAPRequestDoneHandler);
+    child.on("close", function () {
+        if (error) {
+            onFailure(error);
+        } else {
 
+                NMAPRequestDoneHandler(nmapoutputXML, onSuccess, onFailure);
+        }
+    });
+    child.stdin.end();
+ 
     //Handler for data once connection is closed.
-    function NMAPRequestDoneHandler(code) {
+    function NMAPRequestDoneHandler(XML, callback, onFailure) {
         
 
         //turn NMAP's xml output into a json object
-        xml2js.parseString(nmapoutputXML, function (err, result) {
+        xml2js.parseString(XML, function (err, result) {
             if (err) {
-
+                onFailure(err);
             }
             nmapOutputJSON = result;
         });
         //hostsCleaup removes the unwanted variables from the json data
-        cleanOutputJSON = convertXMLtoJSON(nmapOutputJSON);
+        cleanOutputJSON = convertXMLtoJSON(nmapOutputJSON, onFailure);
 
         callback(cleanOutputJSON);
     }
 
-    child.stdin.end();
 }
 
 

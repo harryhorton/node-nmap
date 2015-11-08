@@ -1,10 +1,10 @@
 var nmap = require('./index');
 
-/*
-*    Accepts array or comma separated string of NMAP acceptable hosts
-*/
+//    Accepts array or comma separated string of NMAP acceptable hosts
 nmap.quickScan('127.0.0.1 google.com', function(returnData){
   console.log(JSON.stringify(returnData));
+},function(err){
+  console.log(err);
 });
 // returns
 // [  
@@ -27,11 +27,13 @@ nmap.quickScan('127.0.0.1 google.com', function(returnData){
 //       "osNmap":null
 //    }
 // ]
-/*
-*    Accepts array or comma separarted string for custom nmap commands
-*/
+
+
+//    Accepts array or comma separarted string for custom nmap commands
 nmap.runNMAP('-sn 127.0.0.1 google.com', function(returnData){
   console.log(JSON.stringify(returnData));
+},function(err){
+  console.log(err);
 });
 // returns
 // [  
@@ -56,6 +58,8 @@ nmap.runNMAP('-sn 127.0.0.1 google.com', function(returnData){
 // ]
 nmap.osAndPortScan('google.com', function(returnData){
 	console.log(JSON.stringify(returnData));
+},function(err){
+  console.log(err);
 });
 
 // returns
