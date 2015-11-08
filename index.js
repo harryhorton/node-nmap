@@ -60,7 +60,8 @@ function convertXMLtoJSON(xmlInput) {
                 if (xmlInput[hostLoopIter]["ports"][0]["port"][portLoopIter]['state'][0]['$']['state'] === 'open') {
                     tempHostList[hostLoopIter].openPorts[portLoopIter] = {};
                     //Get the port number
-                    tempHostList[hostLoopIter].openPorts[portLoopIter].port = xmlInput[hostLoopIter]["ports"][0]["port"][portLoopIter]['$']['portid'];
+                    tempHostList[hostLoopIter].openPorts[portLoopIter].port = parseInt(xmlInput[hostLoopIter]["ports"][0]["port"][portLoopIter]['$']['portid']);
+                    
                     //Get the port name
                     tempHostList[hostLoopIter].openPorts[portLoopIter].service = xmlInput[hostLoopIter]["ports"][0]["port"][portLoopIter]['service'][0]['$']['name'];
                 }
@@ -108,7 +109,6 @@ function scanWithPortAndOS(range, callback) {
     }
 
     runNMAP(command, callback);
-
 }
 
 /*
@@ -124,14 +124,14 @@ function runNMAP(inputCommand, callback) {
     var nmapoutputXML = '';
     var nmapOutputJSON;
     var cleanOutputJSON;
-    
+
     if (!Array.isArray(inputCommand)) {
         inputCommand = inputCommand.split(' ');
     }
     command = command.concat(standardArguments);
     command = command.concat(inputCommand);
     var child = spawn(nmapLocation, command);
-    
+
     child.stdout.on("data", function (data) {
         nmapoutputXML += data;
     });
@@ -155,6 +155,7 @@ function runNMAP(inputCommand, callback) {
         });
         //hostsCleaup removes the unwanted variables from the json data
         cleanOutputJSON = convertXMLtoJSON(nmapOutputJSON);
+
         callback(cleanOutputJSON);
     }
 
@@ -170,7 +171,7 @@ module.exports = function () {
             nmapLocation = location;
             return nmapLocation;
         },
-        osDetectionAndPortScan: scanWithPortAndOS,
+        osAndPortScan: scanWithPortAndOS,
         quickScan: quickScan
 
     };
