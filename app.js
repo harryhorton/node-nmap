@@ -1,20 +1,8 @@
-# Node-NMAP
-NPM package enabling your [NodeJs] application to interface with the features of [NMAP].  This package requires that [NMAP] is installed and available to the running node application.
+var nmap = require('./index');
 
-## Installation
-`npm install node-nmap`
-
-## Methods
-* runNmap - This is the core of the package and runs the NMAP command.
-* quickScan - Scans supplied hosts without portscan(-sn).  Use for a quick discovery.
-
-
-## Usage
-```javascript
-var nmap = require('node-nmap');
-
-
-//    Accepts array or comma separated string of NMAP acceptable hosts
+/*
+*    Accepts array or comma separated string of NMAP acceptable hosts
+*/
 nmap.quickScan('127.0.0.1 google.com', function(returnData){
   console.log(JSON.stringify(returnData));
 });
@@ -39,9 +27,9 @@ nmap.quickScan('127.0.0.1 google.com', function(returnData){
 //       "osNmap":null
 //    }
 // ]
-
-
-//    Accepts array or comma separarted string for custom nmap commands
+/*
+*    Accepts array or comma separarted string for custom nmap commands
+*/
 nmap.runNMAP('-sn 127.0.0.1 google.com', function(returnData){
   console.log(JSON.stringify(returnData));
 });
@@ -89,8 +77,3 @@ nmap.osAndPortScan('google.com', function(returnData){
 //       "osNmap":"OpenBSD 4.3"
 //    }
 // ]
-```
-
-[NMAP]: <https://nmap.org/>
-[NPM]: <https://www.npmjs.com/>
-[NodeJs]: <https://nodejs.org/en/>
