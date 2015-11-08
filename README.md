@@ -2,7 +2,7 @@
 # Node-NMAP
 NPM package enabling your [NodeJs] application to interface with the features of [NMAP].  This package requires that [NMAP] is installed and available to the running node application.
 
-Warning:  Occasionally NMAP will freeze when the application is stopped before a complete scan.
+Warning:  Occasionally NMAP will freeze when the application is stopped before a complete scan. \[fix implemented\]
 
 Request:  While runNmap() will accept valid NMAP arguments, the XML to JSON conversion is only checking for specific things.  If there is a common or useful NMAP feature that you would like to see included, please submit an issue and I will work it in.
 

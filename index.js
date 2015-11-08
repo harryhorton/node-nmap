@@ -22,7 +22,7 @@ var nmapLocation = "nmap";
 */
 function convertXMLtoJSON(xmlInput, onFailure) {
     var tempHostList = [];
-    if(!xmlInput['nmaprun']['host']){
+    if (!xmlInput['nmaprun']['host']) {
         onFailure("There was a problem with the supplied NMAP XML");
         return tempHostList;
     };
@@ -139,7 +139,15 @@ function runNMAP(inputCommand, onSuccess, onFailure) {
 
     var error = null;
     var child = spawn(nmapLocation, command);
-
+    process.on('SIGINT', function () {
+        child.kill();
+    });
+    process.on('uncaughtException', function (err) {
+        child.kill();
+    });
+    process.on('exit',function(){
+        child.kill();
+    });
     child.stdout.on("data", function (data) {
         nmapoutputXML += data;
     });
@@ -153,7 +161,7 @@ function runNMAP(inputCommand, onSuccess, onFailure) {
             onFailure(error);
         } else {
 
-                NMAPRequestDoneHandler(nmapoutputXML, onSuccess, onFailure);
+            NMAPRequestDoneHandler(nmapoutputXML, onSuccess, onFailure);
         }
     });
     child.stdin.end();

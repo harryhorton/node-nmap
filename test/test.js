@@ -70,6 +70,17 @@ describe('quickScan', function () {
 
     });
   });
+  it('returns failure data for bad requests', function (done) {
+    
+    this.timeout(10000);
+    nmap.quickScan("127.0.0.", function (data) {
+      
+    },function(err){
+      expect(err).to.be.a('string');
+      done();
+    });
+
+  });
 
 });
 
@@ -88,6 +99,17 @@ describe('osAndPortScan', function () {
       done();
 
     });
+  });
+  it('returns failure data for bad requests', function (done) {
+    
+    this.timeout(10000);
+    nmap.osAndPortScan("127.0.0.", function (data) {
+      
+    },function(err){
+      expect(err).to.be.a('string');
+      done();
+    });
+
   });
 
 });

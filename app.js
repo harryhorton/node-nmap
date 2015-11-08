@@ -1,5 +1,7 @@
 var nmap = require('./index');
-
+console.log(nmap.NmapLocation);
+nmap.NmapLocation = "nothing";
+console.log(nmap.NmapLocation);
 //    Accepts array or comma separated string of NMAP acceptable hosts
 nmap.quickScan('127.0.0.1 google.com', function(returnData){
   console.log(JSON.stringify(returnData));
@@ -56,7 +58,7 @@ nmap.runNMAP('-sn 127.0.0.1 google.com', function(returnData){
 //       "osNmap":null
 //    }
 // ]
-nmap.osAndPortScan('google.com', function(returnData){
+nmap.osAndPortScan('google.com 192.168.1.1-100', function(returnData){
 	console.log(JSON.stringify(returnData));
 },function(err){
   console.log(err);
