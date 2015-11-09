@@ -4,21 +4,39 @@ NPM package enabling your [NodeJs] application to interface with the features of
 
 Warning:  Occasionally NMAP will freeze when the application is stopped before a complete scan. \[fix implemented\]
 
-Request:  While runNmap() will accept valid NMAP arguments, the XML to JSON conversion is only checking for specific things.  If there is a common or useful NMAP feature that you would like to see included, please submit an issue and I will work it in.
+Request:  While NmapScan() will accept valid NMAP arguments, the XML to JSON conversion is only checking for specific things.  If there is a common or useful NMAP feature that you would like to see included, please submit an issue and I will work it in.
 
 ## Installation
 `npm install node-nmap`
 
 ## Methods
-* runNmap - This is the core of the package and runs the NMAP command.
+* NmapScan - This is the core of the package and runs the NMAP command.
 * quickScan - Scans supplied hosts without portscan(-sn).  Use for a quick discovery.
 * osAndPortScan - Scans for open ports as well as NMAP gathered OS information.
 * autoDiscover  - scans as a /24 network range for the local network.  \[only /24 currently, and only finds first interface\]
 
 ## Usage
 
-runNmap is the core function of the package, which accepts a command, success callback, and failure callback.
-All other commands accept onSuccess and onFailure functions as the last 2 parameters passing either the data, or error.
+NmapScan is the core function of the package.  It emits two events: `'complete'` and `'error'`.  Both of these events return data.  All methods are easy to set up.  Simply define a variable as one of the methods, and that variable will become a new instance of NmapScan with appropriately set commands. All input accepts either a space separated string, or an array of strings to make it easier to work with a complex set of hosts.  All methods return an array of JSON objects containing information on each host.  Any key without information provided from NMAP is filled as `null`.
+
+The return structure is:
+
+```javascript
+[  
+    {  
+       "hostname":"theHostname",
+       "ip":"127.0.0.1",
+       "mac":null,
+       "openPorts":[  
+          {  
+             "port":80,
+             "service":"http"
+          },...  
+        ],
+       "osNmap":null //note that osNmap is not guaranteed to be correct.
+    },...]
+```
+### Examples
 
 ```javascript
 var nmap = require('node-nmap');
