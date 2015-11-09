@@ -22,6 +22,7 @@ All other commands accept onSuccess and onFailure functions as the last 2 parame
 
 ```javascript
 var nmap = require('node-nmap');
+nmap.nmapLocation = "nmap"; //default
 
 //    Accepts array or comma separated string of NMAP acceptable hosts
 var quickscan = nmap.quickScan('127.0.0.1 google.com');

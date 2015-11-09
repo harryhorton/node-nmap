@@ -1,5 +1,5 @@
 var nmap = require('./index');
-
+console.log(nmap.nmapLocation);
 var quickscan = nmap.quickScan('127.0.0.1 google.com');
 
 quickscan.on('complete', function(data){

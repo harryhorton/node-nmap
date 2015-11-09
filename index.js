@@ -235,6 +235,7 @@ var autoDiscover = function() {
 module.exports = function () {
     return {
         NmapScan: NmapScan,
+        nmapLocation:nmapLocation,
         setNmapLocation: function (location) {
             nmapLocation = location;
             return nmapLocation;
