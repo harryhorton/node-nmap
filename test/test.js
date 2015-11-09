@@ -4,93 +4,98 @@ var should = require('chai').should(),
 nmap = require('../index');
 
 
-describe('runNMAP', function () {
+describe('NmapScan', function () {
 
   it('runs NMAP', function (done) {
-    
+
     this.timeout(10000);
-    nmap.runNMAP("127.0.0.1", function (data) {
-      NMAPData = data;
+    var scan = nmap.NmapScan("127.0.0.1");
+    scan.on('complete', function (data) {
       expect(data).to.be.instanceOf(Array);
       expect(data).to.not.be.empty;
       expect(data[0]).to.include.keys('hostname', 'ip', 'mac', 'openPorts', 'osNmap');
       done();
     });
-
+    scan.startScan();
   });
 
   it('accepts space separated command', function (done) {
-    
+
     this.timeout(10000);
-    nmap.runNMAP("-sn 127.0.0.1", function (data) {
-      NMAPData = data;
+    var scan = nmap.NmapScan("-sn 127.0.0.1");
+    scan.on('complete', function (data) {
+
       expect(data).to.be.instanceOf(Array);
       expect(data).to.not.be.empty;
       expect(data[0]).to.include.keys('hostname', 'ip', 'mac', 'openPorts', 'osNmap');
       done();
     });
+    scan.startScan();
   });
 
   it('accepts multiple hosts', function (done) {
-    
+
     this.timeout(10000);
-    nmap.runNMAP("-sn 127.0.0.1 google.com", function (data) {
-      NMAPData = data;
+    var scan = nmap.NmapScan("-sn 127.0.0.1 google.com");
+    scan.on('complete', function (data) {
+
       expect(data).to.be.instanceOf(Array);
       expect(data).to.not.be.empty;
       expect(data[1]).to.include.keys('hostname', 'ip', 'mac', 'openPorts', 'osNmap');
       done();
     });
+    scan.startScan();
   });
   it('returns failure data for bad requests', function (done) {
-    
+
     this.timeout(10000);
-    nmap.runNMAP("127.0.0.", function (data) {
-      
-    },function(err){
+    var scan = nmap.NmapScan("127.0.0.");
+    scan.on('error', function (err) {
       expect(err).to.be.a('string');
       done();
     });
-
+    scan.startScan();
   });
 
 });
 
 describe('quickScan', function () {
-  
+
   it('scans range of hosts', function (done) {
-    
+
     this.timeout(10000);
-    nmap.quickScan("127.0.0.1 google.com", function (data) {
-      NMAPData = data;
+    var scan = nmap.quickScan("127.0.0.1 google.com");
+    scan.on('complete', function (data) {
+
       expect(data).to.be.instanceOf(Array);
       expect(data).to.not.be.empty;
       expect(data[1]).to.include.keys('hostname', 'ip', 'mac', 'openPorts', 'osNmap');
       done();
 
     });
+    scan.startScan();
   });
   it('returns failure data for bad requests', function (done) {
-    
+
     this.timeout(10000);
-    nmap.quickScan("127.0.0.", function (data) {
-      
-    },function(err){
+    var scan = nmap.quickScan("127.0.0.");
+    scan.on('error', function (err) {
       expect(err).to.be.a('string');
       done();
     });
+    scan.startScan();
 
   });
 
 });
 
 describe('osAndPortScan', function () {
-  
+
   it('scans hosts for open ports and OS data', function (done) {
-    
+
     this.timeout(20000);
-    nmap.osAndPortScan("google.com", function (data) {
-      NMAPData = data;
+    var scan = nmap.osAndPortScan("google.com");
+    scan.on('complete', function (data) {
       expect(data).to.be.instanceOf(Array);
       expect(data).to.not.be.empty;
       expect(data[0]).to.include.keys('hostname', 'ip', 'mac', 'openPorts', 'osNmap');
@@ -99,16 +104,17 @@ describe('osAndPortScan', function () {
       done();
 
     });
+    scan.startScan();
   });
   it('returns failure data for bad requests', function (done) {
-    
+
     this.timeout(10000);
-    nmap.osAndPortScan("127.0.0.", function (data) {
-      
-    },function(err){
+    var scan = nmap.osAndPortScan("127.0.0.");
+    scan.on('error', function (err) {
       expect(err).to.be.a('string');
       done();
     });
+    scan.startScan();
 
   });
 

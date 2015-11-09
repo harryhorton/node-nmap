@@ -11,6 +11,7 @@ var child_process = require('child_process'),
     fs = require('fs'),
     spawn = require("child_process").spawn,
     xml2js = require('xml2js'),
+    events = require('events'),
     os = require('os');
 
 var nmapLocation = "nmap";
@@ -27,6 +28,7 @@ function convertXMLtoJSON(xmlInput, onFailure) {
         onFailure("There was a problem with the supplied NMAP XML");
         return tempHostList;
     };
+    try{
     xmlInput = xmlInput['nmaprun']['host'];
 
     //Create a new object for each host found
@@ -79,9 +81,11 @@ function convertXMLtoJSON(xmlInput, onFailure) {
         }
 
     };
-
+    }catch(e){
+        onFailure(e);
+    }finally{
     return tempHostList;
-
+    }
 }
 
 
@@ -92,7 +96,7 @@ function convertXMLtoJSON(xmlInput, onFailure) {
 *            function:  callback
 *   @return: Array: List of JSON hosts
 */
-function quickScan(range, onSuccess, onFailure) {
+var quickScan = function(range) {
     var standardArgs = ['-sn', "--system-dns"];
     var command;
     if (Array.isArray(range)) {
@@ -100,11 +104,10 @@ function quickScan(range, onSuccess, onFailure) {
     } else {
         command = standardArgs.concat(range.split(' '));
     }
-    runNMAP(command, onSuccess, onFailure);
-
+ return NmapScan(command)
 };
 
-function scanWithPortAndOS(range, onSuccess, onFailure) {
+var scanWithPortAndOS = function(range) {
     //--osscan-guess or -O
     var standardArgs = ["-O"];
     var command;
@@ -114,7 +117,7 @@ function scanWithPortAndOS(range, onSuccess, onFailure) {
         command = standardArgs.concat(range.split(' '));
     }
 
-    runNMAP(command, onSuccess, onFailure);
+    return NmapScan(command);
 }
 
 /*
@@ -124,68 +127,91 @@ function scanWithPortAndOS(range, onSuccess, onFailure) {
 *             ['-oX', '-', '-sn',"--system-dns","192.168.1.1-254"]
 *   @returns:  Array of Json Hosts to callback
 */
-function runNMAP(inputCommand, onSuccess, onFailure) {
-    var standardArguments = ['-oX', '-'];
-    var command = [];
-    var nmapoutputXML = '';
-    var nmapOutputJSON;
-    var cleanOutputJSON;
+var NmapScan = function (inputCommand) {
+	var standardArguments = ['-oX', '-'];
+	var command = [];
+	var nmapoutputXML = '';
+	if (!Array.isArray(inputCommand)) {
+		inputCommand = inputCommand.split(' ');
+	}
+	command = command.concat(standardArguments);
+	command = command.concat(inputCommand);
 
-    if (!Array.isArray(inputCommand)) {
-        inputCommand = inputCommand.split(' ');
-    }
-    command = command.concat(standardArguments);
-    command = command.concat(inputCommand);
+	function NmapScan() {
+		var self = this;
 
-    var error = null;
-    var child = spawn(nmapLocation, command);
-    process.on('SIGINT', function () {
-        child.kill();
-    });
-    process.on('uncaughtException', function (err) {
-        child.kill();
-    });
-    process.on('exit', function () {
-        child.kill();
-    });
-    child.stdout.on("data", function (data) {
-        nmapoutputXML += data;
-    });
+		self.percentComplete = 0;
+		self.response = [];
+		self.command = command;
+		self.startScan = function () {
 
-    child.stderr.on("data", function (err) {
-        error = err.toString();
-    });
+			var error = null;
+			var child = spawn(nmapLocation, command);
+			
+			process.on('SIGINT', function () {
+				child.kill();
+			});
+			process.on('uncaughtException', function (err) {
+				child.kill();
+			});
+			process.on('exit', function () {
+				child.kill();
+			});
+			
+			child.stdout.on("data", function (data) {
+                if(data.indexOf("percent") > -1){
+                    console.log(data.toString());
+                }else{
+                    nmapoutputXML += data;
+                    
+                }
+                
+				
+			});
 
-    child.on("close", function () {
-        if (error) {
-            onFailure(error);
-        } else {
+			child.stderr.on("data", function (err) {
+				error = err.toString();
+			});
 
-            NMAPRequestDoneHandler(nmapoutputXML, onSuccess, onFailure);
-        }
-    });
-    child.stdin.end();
+			child.on("close", function () {
+				if (error) {
+					self.emit('error', error);
+				} else {
+
+					NMAPRequestDoneHandler(nmapoutputXML);
+				}
+			});
+			
+			child.stdin.end();
  
-    //Handler for data once connection is closed.
-    function NMAPRequestDoneHandler(XML, callback, onFailure) {
+			//Handler for data once connection is closed.
+			function NMAPRequestDoneHandler(XML) {
         
+				var nmapOutputJSON;
+				//turn NMAP's xml output into a json object
+				xml2js.parseString(XML, function (err, result) {
+					if (err) {
+						self.emit('error', err);
+					}
+					nmapOutputJSON = result;
+                    
+				});
+				//hostsCleaup removes the unwanted variables from the json data
+                
+				self.response = convertXMLtoJSON(nmapOutputJSON, function(err){
+					self.emit('error', err);
+				});
+                
+				self.emit('complete', self.response);
+			}
+		};
+	}
+	NmapScan.prototype = new events.EventEmitter;
 
-        //turn NMAP's xml output into a json object
-        xml2js.parseString(XML, function (err, result) {
-            if (err) {
-                onFailure(err);
-            }
-            nmapOutputJSON = result;
-        });
-        //hostsCleaup removes the unwanted variables from the json data
-        cleanOutputJSON = convertXMLtoJSON(nmapOutputJSON, onFailure);
+	return new NmapScan;
+};
 
-        callback(cleanOutputJSON);
-    }
-
-}
-
-function autoDiscover(onSuccess, onFailure) {
+var autoDiscover = function() {
     var interfaces = os.networkInterfaces();
     var addresses = [];
     for (var k in interfaces) {
@@ -201,15 +227,14 @@ function autoDiscover(onSuccess, onFailure) {
     octets.pop();
     octets = octets.concat('1-254');
     var range = octets.join('.');
-    quickScan(range, onSuccess, onFailure);
+    return quickScan(range);
     
 }
 
 
 module.exports = function () {
     return {
-        NmapLocation: nmapLocation,
-        runNMAP: runNMAP,
+        NmapScan: NmapScan,
         setNmapLocation: function (location) {
             nmapLocation = location;
             return nmapLocation;

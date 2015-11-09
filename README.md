@@ -24,11 +24,17 @@ All other commands accept onSuccess and onFailure functions as the last 2 parame
 var nmap = require('node-nmap');
 
 //    Accepts array or comma separated string of NMAP acceptable hosts
-nmap.quickScan('127.0.0.1 google.com', function(returnData){
-  console.log(JSON.stringify(returnData));
-},function(err){
-  console.log(err);
+var quickscan = nmap.quickScan('127.0.0.1 google.com');
+
+quickscan.on('complete', function(data){
+  console.log(data);
 });
+
+quickscan.on('error', function(error){
+  console.log(error);
+});
+
+quickscan.startScan();
 // returns
 // [  
 //    {  
@@ -53,11 +59,17 @@ nmap.quickScan('127.0.0.1 google.com', function(returnData){
 
 
 //    Accepts array or comma separarted string for custom nmap commands
-nmap.runNMAP('-sn 127.0.0.1 google.com', function(returnData){
-  console.log(JSON.stringify(returnData));
-},function(err){
-  console.log(err);
+var nmapscan = nmap.NmapScan('-sn 127.0.0.1 google.com');
+
+nmapscan.on('complete',function(data){
+  console.log(data);
 });
+nmapscan.on('error', function(error){
+  console.log(error);
+});
+
+nmapscan.startScan();
+
 // returns
 // [  
 //    {  
@@ -79,11 +91,16 @@ nmap.runNMAP('-sn 127.0.0.1 google.com', function(returnData){
 //       "osNmap":null
 //    }
 // ]
-nmap.osAndPortScan('google.com', function(returnData){
-	console.log(JSON.stringify(returnData));
-},function(err){
-  console.log(err);
+var osandports = nmap.osAndPortScan('google.com');
+
+osandports.on('complete',function(data){
+  console.log(data);
 });
+osandports.on('error', function(error){
+  console.log(error);
+});
+
+osandports.startScan();
 
 // returns
 // [
@@ -104,11 +121,16 @@ nmap.osAndPortScan('google.com', function(returnData){
 //       "osNmap":"OpenBSD 4.3"
 //    }
 // ]
-nmap.autoDiscover(function(data){
+var discover = nmap.autoDiscover();
+
+discover.on('complete',function(data){
   console.log(data);
-},function(err){
-  console.log(err);
 });
+discover.on('error', function(error){
+  console.log(error);
+});
+
+discover.startScan();
 
 ```
 
