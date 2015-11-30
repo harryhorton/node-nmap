@@ -1,118 +1,137 @@
+
 /*
  * NodeJS <-> NMAP interface
  * Author:  John Horton
  * Purpose: Create an interface for NodeJS applications to make use of NMAP installed on the local system.
  */
-var __extends = (this && this.__extends) || function (d, b) {
-    for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
-    function __() { this.constructor = d; }
-    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
-};
+
 ///<reference path="./typings/node/node.d.ts" />
-var child_process = require('child_process');
-var spawn = child_process.spawn;
-var events = require('events');
-var os = require('os');
+import child_process = require('child_process');
+import execSync = child_process.execSync;
+import exec = child_process.exec;
+import spawn = child_process.spawn;
+import fs = require('fs');
+import events = require('events');
+import os = require('os');
+import Queue = require('queued-up');
 var xml2js = require('xml2js');
-var nodenmap;
-(function (nodenmap) {
-    nodenmap.nmapLocation = "nmap";
-    var NmapScan = (function (_super) {
-        __extends(NmapScan, _super);
-        function NmapScan(range, inputArguments) {
-            _super.call(this);
-            this.command = [];
-            this.nmapoutputXML = "";
-            this.range = [];
-            this.arguments = ['-oX', '-'];
-            this.rawData = '';
-            this.error = null;
+
+export module nodenmap {
+    export interface host{
+        hostname:string;
+        ip:string;
+        mac:any;
+        openPorts: Array<port>;
+        osNmap: string;
+    }
+    export interface port {
+        port: number;
+        service: string;
+    }
+    export var nmapLocation = "nmap";
+
+    export class NmapScan extends events.EventEmitter {
+
+        command: string[] = [];
+        private nmapoutputXML: string = "";
+        range: string[] = [];
+        arguments: string[] = ['-oX', '-'];
+        rawData: string ='';
+        rawJSON: any;
+        child: any;
+        error: string = null;
+        scanResults:host[];
+        constructor(range: any, inputArguments?: any) {
+            super();
             this.commandConstructor(range, inputArguments);
             this.initializeChildProcess();
         }
-        NmapScan.prototype.commandConstructor = function (range, additionalArguments) {
+
+        private commandConstructor(range: any, additionalArguments?: any) {
             if (additionalArguments) {
                 if (!Array.isArray(additionalArguments)) {
                     additionalArguments = additionalArguments.split(' ');
                 }
                 this.command = this.arguments.concat(additionalArguments);
-            }
-            else {
+            }else{
                 this.command = this.arguments;
             }
+
             if (!Array.isArray(range)) {
                 range = range.split(' ');
             }
             this.range = range;
             this.command = this.command.concat(this.range);
-        };
-        NmapScan.prototype.initializeChildProcess = function () {
-            var _this = this;
-            this.child = spawn(nodenmap.nmapLocation, this.command);
-            process.on('SIGINT', function () {
-                _this.child.kill();
+        }
+        private initializeChildProcess() {
+            this.child = spawn(nmapLocation, this.command);
+
+            process.on('SIGINT', () => {
+                this.child.kill();
             });
-            process.on('uncaughtException', function (err) {
-                _this.child.kill();
+            process.on('uncaughtException', (err) => {
+                this.child.kill();
             });
-            process.on('exit', function () {
-                _this.child.kill();
+            process.on('exit', () => {
+                this.child.kill();
             });
-            this.child.stdout.on("data", function (data) {
+            this.child.stdout.on("data", (data) => {
                 if (data.indexOf("percent") > -1) {
                     console.log(data.toString());
+                } else {
+                    this.rawData += data;
                 }
-                else {
-                    _this.rawData += data;
+
+            });
+
+            this.child.stderr.on("data", (err) => {
+                this.error = err.toString();
+            });
+
+            this.child.on("close", () => {
+                if (this.error) {
+                    this.emit('error', this.error);
+                } else {
+                    this.rawDataHandler(this.rawData);
                 }
             });
-            this.child.stderr.on("data", function (err) {
-                _this.error = err.toString();
-            });
-            this.child.on("close", function () {
-                if (_this.error) {
-                    _this.emit('error', _this.error);
-                }
-                else {
-                    _this.rawDataHandler(_this.rawData);
-                }
-            });
-        };
-        NmapScan.prototype.startScan = function () {
+        }
+        startScan() {
             this.child.stdin.end();
-        };
-        NmapScan.prototype.scanComplete = function (results) {
+        }
+        scanComplete(results:host[]){
             this.scanResults = results;
             this.emit('complete', this.scanResults);
-        };
-        NmapScan.prototype.rawDataHandler = function (data) {
-            var _this = this;
-            var results;
+        }
+        private rawDataHandler(data) {
+            var results : host[];
             //turn NMAP's xml output into a json object
-            xml2js.parseString(data, function (err, result) {
+            xml2js.parseString(data, (err, result) => {
                 if (err) {
-                    _this.emit('error', "Error converting XML to JSON in xml2js: " + err);
-                }
-                else {
-                    _this.rawJSON = result;
-                    results = _this.convertRawJsonToScanResults(_this.rawJSON, function (err) {
-                        _this.emit('error', "Error converting raw json to cleans can results: " + err);
+                    this.emit('error', "Error converting XML to JSON in xml2js: "+err);
+                } else {
+                    this.rawJSON = result;
+                    results = this.convertRawJsonToScanResults(this.rawJSON, (err) => {
+                        this.emit('error', "Error converting raw json to cleans can results: " + err);
                     });
-                    _this.scanComplete(results);
+                    this.scanComplete(results);
                 }
+
             });
-        };
-        NmapScan.prototype.convertRawJsonToScanResults = function (xmlInput, onFailure) {
+
+        }
+        private convertRawJsonToScanResults(xmlInput, onFailure):host[] {
             var tempHostList = [];
             if (!xmlInput['nmaprun']['host']) {
                 onFailure("There was a problem with the supplied NMAP XML");
                 return tempHostList;
-            }
-            ;
+            };
             try {
                 xmlInput = xmlInput['nmaprun']['host'];
+
                 //Create a new object for each host found
                 for (var hostLoopIter = 0; hostLoopIter < xmlInput.length; hostLoopIter++) {
+
                     //create the temphost object for each host.
                     tempHostList[hostLoopIter] = {
                         hostname: null,
@@ -126,68 +145,59 @@ var nodenmap;
                     }
                     //For each network address type found
                     for (var addressLoopIter = 0; addressLoopIter < xmlInput[hostLoopIter]["address"].length; addressLoopIter++) {
+
                         //If IPv4, Mac, or unknown.  Get the type and add it or log the type found.
                         if (xmlInput[hostLoopIter]["address"][addressLoopIter]["$"]["addrtype"] === 'ipv4') {
                             tempHostList[hostLoopIter].ip = xmlInput[hostLoopIter]["address"][addressLoopIter]["$"]["addr"];
-                        }
-                        else if (xmlInput[hostLoopIter]["address"][addressLoopIter]["$"]["addrtype"] === 'mac') {
+                        } else if (xmlInput[hostLoopIter]["address"][addressLoopIter]["$"]["addrtype"] === 'mac') {
                             tempHostList[hostLoopIter].mac = xmlInput[hostLoopIter]["address"][addressLoopIter]["$"]["addr"];
-                        }
-                        else {
+                        } else {
+
                         }
                     }
                     //check if port list is available
                     if (xmlInput[hostLoopIter]["ports"] && xmlInput[hostLoopIter]["ports"][0]["port"]) {
+
                         //for each port scanned
                         for (var portLoopIter = 0; portLoopIter < xmlInput[hostLoopIter]["ports"][0]["port"].length; portLoopIter++) {
+
                             //if the state of the port is open
                             if (xmlInput[hostLoopIter]["ports"][0]["port"][portLoopIter]['state'][0]['$']['state'] === 'open') {
                                 tempHostList[hostLoopIter].openPorts[portLoopIter] = {};
                                 //Get the port number
                                 tempHostList[hostLoopIter].openPorts[portLoopIter].port = parseInt(xmlInput[hostLoopIter]["ports"][0]["port"][portLoopIter]['$']['portid']);
+                    
                                 //Get the port name
                                 tempHostList[hostLoopIter].openPorts[portLoopIter].service = xmlInput[hostLoopIter]["ports"][0]["port"][portLoopIter]['service'][0]['$']['name'];
                             }
                         }
                     }
                     if (xmlInput[hostLoopIter].os && xmlInput[hostLoopIter].os[0].osmatch && xmlInput[hostLoopIter].os[0].osmatch[0].$.name) {
-                        tempHostList[hostLoopIter].osNmap = xmlInput[hostLoopIter].os[0].osmatch[0].$.name;
-                    }
-                    else {
+                        tempHostList[hostLoopIter].osNmap = xmlInput[hostLoopIter].os[0].osmatch[0].$.name
+                    } else {
                         tempHostList[hostLoopIter].osNmap = null;
                     }
-                }
-                ;
-            }
-            catch (e) {
+
+                };
+            } catch (e) {
                 onFailure(e);
-            }
-            finally {
+            } finally {
                 return tempHostList;
             }
-        };
-        return NmapScan;
-    })(events.EventEmitter);
-    nodenmap.NmapScan = NmapScan;
-    var quickScan = (function (_super) {
-        __extends(quickScan, _super);
-        function quickScan(range) {
-            _super.call(this, range, '-sV');
         }
-        return quickScan;
-    })(NmapScan);
-    nodenmap.quickScan = quickScan;
-    var osAndPortScan = (function (_super) {
-        __extends(osAndPortScan, _super);
-        function osAndPortScan(range) {
-            _super.call(this, range, '-O');
+    }
+    export class quickScan extends NmapScan{
+        constructor(range:any){
+            super(range, '-sV');
         }
-        return osAndPortScan;
-    })(NmapScan);
-    nodenmap.osAndPortScan = osAndPortScan;
-    var autoDiscover = (function (_super) {
-        __extends(autoDiscover, _super);
-        function autoDiscover() {
+    }
+    export class osAndPortScan extends NmapScan{
+        constructor(range:any){
+            super(range, '-O');
+        }
+    }
+    export class autoDiscover extends NmapScan{
+        constructor(){
             var interfaces = os.networkInterfaces();
             var addresses = [];
             for (var k in interfaces) {
@@ -203,11 +213,12 @@ var nodenmap;
             octets.pop();
             octets = octets.concat('1-254');
             var range = octets.join('.');
-            _super.call(this, range, '-sV -O');
+            super(range, '-sV -O');
         }
-        return autoDiscover;
-    })(NmapScan);
-    nodenmap.autoDiscover = autoDiscover;
-})(nodenmap = exports.nodenmap || (exports.nodenmap = {}));
+    }
+}
+
 exports = nodenmap;
-//# sourceMappingURL=index.js.map
+
+
+

@@ -2,7 +2,8 @@
 # Node-NMAP
 NPM package enabling your [NodeJs] application to interface with the features of [NMAP].  This package requires that [NMAP] is installed and available to the running node application.
 
-Warning:  Occasionally NMAP will freeze when the application is stopped before a complete scan. \[fix implemented\]
+UPDATE: I have rewritten the module in TypeScript.  the .d.ts file is located at /node_modules/node-nmap/index.d.ts.
+As a part of this update, there is an additional maping for the namespace/module, as well as a requirement to use `new` for each scan.
 
 Request:  While NmapScan() will accept valid NMAP arguments, the XML to JSON conversion is only checking for specific things.  If there is a common or useful NMAP feature that you would like to see included, please submit an issue and I will work it in.
 
@@ -40,10 +41,11 @@ The return structure is:
 
 ```javascript
 var nmap = require('node-nmap');
-nmap.nmapLocation = "nmap"; //default
+
+nmap.nodenmap.nmapLocation = "nmap"; //default
 
 //    Accepts array or comma separated string of NMAP acceptable hosts
-var quickscan = nmap.quickScan('127.0.0.1 google.com');
+var quickscan = new nmap.nodenmap.quickScan('127.0.0.1 google.com');
 
 quickscan.on('complete', function(data){
   console.log(data);
@@ -77,8 +79,8 @@ quickscan.startScan();
 // ]
 
 
-//    Accepts array or comma separarted string for custom nmap commands
-var nmapscan = nmap.NmapScan('-sn 127.0.0.1 google.com');
+//    Accepts array or comma separarted string for custom nmap commands in the second argument.
+var nmapscan = new nmap.nodenmap.NmapScan('127.0.0.1 google.com', '-sn');
 
 nmapscan.on('complete',function(data){
   console.log(data);
@@ -110,7 +112,7 @@ nmapscan.startScan();
 //       "osNmap":null
 //    }
 // ]
-var osandports = nmap.osAndPortScan('google.com');
+var osandports = new nmap.nodenmap.osAndPortScan('google.com');
 
 osandports.on('complete',function(data){
   console.log(data);
@@ -140,7 +142,7 @@ osandports.startScan();
 //       "osNmap":"OpenBSD 4.3"
 //    }
 // ]
-var discover = nmap.autoDiscover();
+var discover = new nmap.nodenmap.autoDiscover();
 
 discover.on('complete',function(data){
   console.log(data);
