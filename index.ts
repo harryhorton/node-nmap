@@ -139,8 +139,8 @@ export module nodenmap {
                         mac: null,
                         openPorts: []
                     };
-                    //Check if the hostname is avaialble.  \r\n is what will return if not available.
-                    if (xmlInput[hostLoopIter]['hostnames'][0] !== "\r\n") {
+                    //Check if the hostname is avaialble.  \r\n or \n is what will return if not available.
+                    if (xmlInput[hostLoopIter]['hostnames'][0] !== "\r\n" && xmlInput[hostLoopIter]['hostnames'][0] !== "\n") {
                         tempHostList[hostLoopIter].hostname = xmlInput[hostLoopIter]['hostnames'][0]['hostname'][0]['$']['name'];
                     }
                     //For each network address type found
