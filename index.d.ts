@@ -40,4 +40,21 @@ export declare module nodenmap {
     class autoDiscover extends NmapScan {
         constructor();
     }
+    class queuedScan extends events.EventEmitter {
+        private _queue;
+        scanResults: host[];
+        constructor(range: any, action?: Function);
+        private rangeFormatter(range);
+        startRunScan(index?: number): void;
+        startShiftScan(): void;
+        pause(): void;
+        resume(): void;
+        next(iterations?: number): any;
+        shift(iterations?: number): any;
+        results(): host[];
+        shiftResults(): host;
+        index(): any;
+        queue(newQueue?: any[]): any[];
+        percentComplete(): number;
+    }
 }

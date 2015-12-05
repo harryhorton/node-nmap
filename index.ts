@@ -17,10 +17,10 @@ import Queue = require('queued-up');
 var xml2js = require('xml2js');
 
 export module nodenmap {
-    export interface host{
-        hostname:string;
-        ip:string;
-        mac:any;
+    export interface host {
+        hostname: string;
+        ip: string;
+        mac: any;
         openPorts: Array<port>;
         osNmap: string;
     }
@@ -36,11 +36,11 @@ export module nodenmap {
         private nmapoutputXML: string = "";
         range: string[] = [];
         arguments: string[] = ['-oX', '-'];
-        rawData: string ='';
+        rawData: string = '';
         rawJSON: any;
         child: any;
         error: string = null;
-        scanResults:host[];
+        scanResults: host[];
         constructor(range: any, inputArguments?: any) {
             super();
             this.commandConstructor(range, inputArguments);
@@ -53,7 +53,7 @@ export module nodenmap {
                     additionalArguments = additionalArguments.split(' ');
                 }
                 this.command = this.arguments.concat(additionalArguments);
-            }else{
+            } else {
                 this.command = this.arguments;
             }
 
@@ -99,20 +99,22 @@ export module nodenmap {
         startScan() {
             this.child.stdin.end();
         }
-        scanComplete(results:host[]){
+        scanComplete(results: host[]) {
             this.scanResults = results;
             this.emit('complete', this.scanResults);
         }
         private rawDataHandler(data) {
-            var results : host[];
+            var results: host[];
             //turn NMAP's xml output into a json object
             xml2js.parseString(data, (err, result) => {
                 if (err) {
-                    this.emit('error', "Error converting XML to JSON in xml2js: "+err);
+                    this.emit('error', "Error converting XML to JSON in xml2js: " + err);
                 } else {
                     this.rawJSON = result;
                     results = this.convertRawJsonToScanResults(this.rawJSON, (err) => {
-                        this.emit('error', "Error converting raw json to cleans can results: " + err);
+                         console.log(this.rawJSON);
+                        this.emit('error', "Error converting raw json to cleans can results: " + err + ": " + this.rawJSON);
+                       
                     });
                     this.scanComplete(results);
                 }
@@ -120,10 +122,10 @@ export module nodenmap {
             });
 
         }
-        private convertRawJsonToScanResults(xmlInput, onFailure):host[] {
+        private convertRawJsonToScanResults(xmlInput, onFailure): host[] {
             var tempHostList = [];
             if (!xmlInput['nmaprun']['host']) {
-                onFailure("There was a problem with the supplied NMAP XML");
+                //onFailure("There was a problem with the supplied NMAP XML");
                 return tempHostList;
             };
             try {
@@ -186,18 +188,18 @@ export module nodenmap {
             }
         }
     }
-    export class quickScan extends NmapScan{
-        constructor(range:any){
-            super(range, '-sV');
+    export class quickScan extends NmapScan {
+        constructor(range: any) {
+            super(range, '-sP');
         }
     }
-    export class osAndPortScan extends NmapScan{
-        constructor(range:any){
+    export class osAndPortScan extends NmapScan {
+        constructor(range: any) {
             super(range, '-O');
         }
     }
-    export class autoDiscover extends NmapScan{
-        constructor(){
+    export class autoDiscover extends NmapScan {
+        constructor() {
             var interfaces = os.networkInterfaces();
             var addresses = [];
             for (var k in interfaces) {
@@ -214,6 +216,118 @@ export module nodenmap {
             octets = octets.concat('1-254');
             var range = octets.join('.');
             super(range, '-sV -O');
+        }
+    }
+    export class queuedScan extends events.EventEmitter {
+        private _queue: Queue
+        scanResults: host[] = []
+        constructor(range: any, action:Function = ()=>{}) {
+            super();
+            
+            this._queue = new Queue((host) => {
+                var scan = new quickScan(host)
+                
+                scan.on('complete', (data) => {
+                    this.scanResults = this.scanResults.concat(data);
+                   action(data);
+                    this._queue.done();
+                });
+                
+                scan.startScan();
+            });
+
+            this._queue.add(this.rangeFormatter(range));
+            
+            this._queue.on('complete', () => {
+                this.emit('complete', this.scanResults);
+            });
+        }
+        
+        private rangeFormatter(range){
+            var outputRange = [];
+            if (!Array.isArray(range)) {
+                range = range.split(' ');
+            }
+            
+            for (var i = 0; i < range.length; i++) {
+                var input = range[i];
+                var temprange = range[i]; 
+                if(countCharacterOccurence(input, ".") === 3
+                && !input.match(/^[a-zA-Z]+$/)
+                && input.match(new RegExp("-","g")).length === 1
+                ){
+                    var firstIP = input.slice(0, input.indexOf("-"));
+                    var network;
+                    var lastNumber = input.slice(input.indexOf("-")+1);
+                    var firstNumber;
+                    var newRange =[];
+                    for (var j = firstIP.length -1; j > -1; j--) {
+                        if(firstIP.charAt(j) === "."){
+                            firstNumber = firstIP.slice(j+1);
+                            network = firstIP.slice(0,j+1);
+                            break;
+                        }
+                    }
+                    for (var iter = firstNumber; iter <= lastNumber; iter++) {
+                        newRange.push(network + iter);
+                    }
+                    //replace the range/host string with array
+                    temprange = newRange;
+                }
+                outputRange = outputRange.concat(temprange);
+            }
+            function countCharacterOccurence(input, character){
+                var num = 0;
+                for (var k = 0; k < input.length; k++) {
+                    if(input.charAt(k) === character){
+                        num++;
+                    }
+                }
+                return num;
+            }
+            return outputRange;
+        }
+        startRunScan(index: number = 0) {
+            this.scanResults = [];
+            this._queue.run(0);
+        }
+        startShiftScan() {
+            this.scanResults = [];
+            this._queue.shiftRun();
+        }
+        pause() {
+            this._queue.pause();
+        }
+        resume() {
+            this._queue.resume();
+        }
+        next(iterations: number = 1) {
+            return this._queue.next(iterations);
+        }
+        shift(iterations: number = 1) {
+            return this._queue.shift(iterations);
+        }
+        results() {
+            return this.scanResults;
+        }
+        shiftResults() {
+            this._queue.shiftResults();
+            return this.scanResults.shift();
+        }
+        index() {
+            return this._queue.index();
+        }
+        queue(newQueue?: any[]): any[] {
+
+            if (Array.isArray(newQueue)) {
+                return this._queue.queue(newQueue);
+                
+            } else {
+                return this._queue.queue();
+            }
+        }
+        percentComplete(){
+            return Math.round(((this._queue.index()+1) / this._queue.queue().length) *100);
         }
     }
 }

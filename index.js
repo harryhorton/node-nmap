@@ -13,6 +13,7 @@ var child_process = require('child_process');
 var spawn = child_process.spawn;
 var events = require('events');
 var os = require('os');
+var Queue = require('queued-up');
 var xml2js = require('xml2js');
 var nodenmap;
 (function (nodenmap) {
@@ -96,7 +97,8 @@ var nodenmap;
                 else {
                     _this.rawJSON = result;
                     results = _this.convertRawJsonToScanResults(_this.rawJSON, function (err) {
-                        _this.emit('error', "Error converting raw json to cleans can results: " + err);
+                        console.log(_this.rawJSON);
+                        _this.emit('error', "Error converting raw json to cleans can results: " + err + ": " + _this.rawJSON);
                     });
                     _this.scanComplete(results);
                 }
@@ -105,7 +107,7 @@ var nodenmap;
         NmapScan.prototype.convertRawJsonToScanResults = function (xmlInput, onFailure) {
             var tempHostList = [];
             if (!xmlInput['nmaprun']['host']) {
-                onFailure("There was a problem with the supplied NMAP XML");
+                //onFailure("There was a problem with the supplied NMAP XML");
                 return tempHostList;
             }
             ;
@@ -172,7 +174,7 @@ var nodenmap;
     var quickScan = (function (_super) {
         __extends(quickScan, _super);
         function quickScan(range) {
-            _super.call(this, range, '-sV');
+            _super.call(this, range, '-sP');
         }
         return quickScan;
     })(NmapScan);
@@ -208,6 +210,116 @@ var nodenmap;
         return autoDiscover;
     })(NmapScan);
     nodenmap.autoDiscover = autoDiscover;
+    var queuedScan = (function (_super) {
+        __extends(queuedScan, _super);
+        function queuedScan(range, action) {
+            var _this = this;
+            if (action === void 0) { action = function () { }; }
+            _super.call(this);
+            this.scanResults = [];
+            this._queue = new Queue(function (host) {
+                var scan = new quickScan(host);
+                scan.on('complete', function (data) {
+                    _this.scanResults = _this.scanResults.concat(data);
+                    action(data);
+                    _this._queue.done();
+                });
+                scan.startScan();
+            });
+            this._queue.add(this.rangeFormatter(range));
+            this._queue.on('complete', function () {
+                _this.emit('complete', _this.scanResults);
+            });
+        }
+        queuedScan.prototype.rangeFormatter = function (range) {
+            var outputRange = [];
+            if (!Array.isArray(range)) {
+                range = range.split(' ');
+            }
+            for (var i = 0; i < range.length; i++) {
+                var input = range[i];
+                var temprange = range[i];
+                if (countCharacterOccurence(input, ".") === 3
+                    && !input.match(/^[a-zA-Z]+$/)
+                    && input.match(new RegExp("-", "g")).length === 1) {
+                    var firstIP = input.slice(0, input.indexOf("-"));
+                    var network;
+                    var lastNumber = input.slice(input.indexOf("-") + 1);
+                    var firstNumber;
+                    var newRange = [];
+                    for (var j = firstIP.length - 1; j > -1; j--) {
+                        if (firstIP.charAt(j) === ".") {
+                            firstNumber = firstIP.slice(j + 1);
+                            network = firstIP.slice(0, j + 1);
+                            break;
+                        }
+                    }
+                    for (var iter = firstNumber; iter <= lastNumber; iter++) {
+                        newRange.push(network + iter);
+                    }
+                    //replace the range/host string with array
+                    temprange = newRange;
+                }
+                outputRange = outputRange.concat(temprange);
+            }
+            function countCharacterOccurence(input, character) {
+                var num = 0;
+                for (var k = 0; k < input.length; k++) {
+                    if (input.charAt(k) === character) {
+                        num++;
+                    }
+                }
+                return num;
+            }
+            return outputRange;
+        };
+        queuedScan.prototype.startRunScan = function (index) {
+            if (index === void 0) { index = 0; }
+            this.scanResults = [];
+            this._queue.run(0);
+        };
+        queuedScan.prototype.startShiftScan = function () {
+            this.scanResults = [];
+            this._queue.shiftRun();
+        };
+        queuedScan.prototype.pause = function () {
+            this._queue.pause();
+        };
+        queuedScan.prototype.resume = function () {
+            this._queue.resume();
+        };
+        queuedScan.prototype.next = function (iterations) {
+            if (iterations === void 0) { iterations = 1; }
+            return this._queue.next(iterations);
+        };
+        queuedScan.prototype.shift = function (iterations) {
+            if (iterations === void 0) { iterations = 1; }
+            return this._queue.shift(iterations);
+        };
+        queuedScan.prototype.results = function () {
+            return this.scanResults;
+        };
+        queuedScan.prototype.shiftResults = function () {
+            this._queue.shiftResults();
+            return this.scanResults.shift();
+        };
+        queuedScan.prototype.index = function () {
+            return this._queue.index();
+        };
+        queuedScan.prototype.queue = function (newQueue) {
+            if (Array.isArray(newQueue)) {
+                return this._queue.queue(newQueue);
+            }
+            else {
+                return this._queue.queue();
+            }
+        };
+        queuedScan.prototype.percentComplete = function () {
+            return Math.round(((this._queue.index() + 1) / this._queue.queue().length) * 100);
+        };
+        return queuedScan;
+    })(events.EventEmitter);
+    nodenmap.queuedScan = queuedScan;
 })(nodenmap = exports.nodenmap || (exports.nodenmap = {}));
 exports = nodenmap;
 //# sourceMappingURL=index.js.map

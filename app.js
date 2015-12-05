@@ -1,15 +1,10 @@
 var nmap = require('./index');
-var scan = new nmap.("google.com");
-scan.on('error', function (err) {
-    console.log(err);
-    console.log(scan.rawData);
+var scan = new nmap.nodenmap.queuedScan("google.com 192.168.0.1-10", function (data) {
+    console.log(data);
+    console.log(scan.percentComplete());
 });
 scan.on('complete', function (data) {
-    logHost(data[0]);
+    console.log(data);
 });
-console.log(scan.command);
-scan.startScan();
-function logHost(host) {
-    console.log(host);
-}
+scan.startRunScan();
 //# sourceMappingURL=app.js.map
