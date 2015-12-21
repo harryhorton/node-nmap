@@ -12,7 +12,6 @@ var __extends = (this && this.__extends) || function (d, b) {
 var child_process = require('child_process');
 var spawn = child_process.spawn;
 var events = require('events');
-var os = require('os');
 var Queue = require('queued-up');
 var xml2js = require('xml2js');
 var nodenmap;
@@ -27,10 +26,25 @@ var nodenmap;
             this.range = [];
             this.arguments = ['-oX', '-'];
             this.rawData = '';
+            this.cancelled = false;
+            this.scanTime = 0;
             this.error = null;
+            this.scanTimeout = 0;
             this.commandConstructor(range, inputArguments);
             this.initializeChildProcess();
         }
+        NmapScan.prototype.startTimer = function () {
+            var _this = this;
+            this.timer = setInterval(function () {
+                _this.scanTime += 10;
+                if (_this.scanTime >= _this.scanTimeout && _this.scanTimeout !== 0) {
+                    _this.killChild();
+                }
+            }, 10);
+        };
+        NmapScan.prototype.stopTimer = function () {
+            clearInterval(this.timer);
+        };
         NmapScan.prototype.commandConstructor = function (range, additionalArguments) {
             if (additionalArguments) {
                 if (!Array.isArray(additionalArguments)) {
@@ -47,18 +61,17 @@ var nodenmap;
             this.range = range;
             this.command = this.command.concat(this.range);
         };
+        NmapScan.prototype.killChild = function () {
+            this.cancelled = true;
+            this.child.kill();
+        };
         NmapScan.prototype.initializeChildProcess = function () {
             var _this = this;
+            this.startTimer();
             this.child = spawn(nodenmap.nmapLocation, this.command);
-            process.on('SIGINT', function () {
-                _this.child.kill();
-            });
-            process.on('uncaughtException', function (err) {
-                _this.child.kill();
-            });
-            process.on('exit', function () {
-                _this.child.kill();
-            });
+            process.on('SIGINT', this.killChild);
+            process.on('uncaughtException', this.killChild);
+            process.on('exit', this.killChild);
             this.child.stdout.on("data", function (data) {
                 if (data.indexOf("percent") > -1) {
                     console.log(data.toString());
@@ -69,10 +82,17 @@ var nodenmap;
             });
             this.child.stderr.on("data", function (err) {
                 _this.error = err.toString();
+                console.log("error found:" + _this.error);
             });
             this.child.on("close", function () {
+                process.removeListener('SIGINT', _this.killChild);
+                process.removeListener('uncaughtException', _this.killChild);
+                process.removeListener('exit', _this.killChild);
                 if (_this.error) {
                     _this.emit('error', _this.error);
+                }
+                else if (_this.cancelled === true) {
+                    _this.emit('error', "Over scan timeout " + _this.scanTimeout);
                 }
                 else {
                     _this.rawDataHandler(_this.rawData);
@@ -82,8 +102,13 @@ var nodenmap;
         NmapScan.prototype.startScan = function () {
             this.child.stdin.end();
         };
+        NmapScan.prototype.cancelScan = function () {
+            this.killChild();
+            this.emit('error', "Scan cancelled");
+        };
         NmapScan.prototype.scanComplete = function (results) {
             this.scanResults = results;
+            this.stopTimer();
             this.emit('complete', this.scanResults);
         };
         NmapScan.prototype.rawDataHandler = function (data) {
@@ -171,67 +196,99 @@ var nodenmap;
         return NmapScan;
     })(events.EventEmitter);
     nodenmap.NmapScan = NmapScan;
-    var quickScan = (function (_super) {
-        __extends(quickScan, _super);
-        function quickScan(range) {
+    var QuickScan = (function (_super) {
+        __extends(QuickScan, _super);
+        function QuickScan(range) {
             _super.call(this, range, '-sP');
         }
-        return quickScan;
+        return QuickScan;
     })(NmapScan);
-    nodenmap.quickScan = quickScan;
-    var osAndPortScan = (function (_super) {
-        __extends(osAndPortScan, _super);
-        function osAndPortScan(range) {
+    nodenmap.QuickScan = QuickScan;
+    var OsAndPortScan = (function (_super) {
+        __extends(OsAndPortScan, _super);
+        function OsAndPortScan(range) {
             _super.call(this, range, '-O');
         }
-        return osAndPortScan;
+        return OsAndPortScan;
     })(NmapScan);
-    nodenmap.osAndPortScan = osAndPortScan;
-    var autoDiscover = (function (_super) {
-        __extends(autoDiscover, _super);
-        function autoDiscover() {
-            var interfaces = os.networkInterfaces();
-            var addresses = [];
-            for (var k in interfaces) {
-                for (var k2 in interfaces[k]) {
-                    var address = interfaces[k][k2];
-                    if (address.family === 'IPv4' && !address.internal) {
-                        addresses.push(address.address);
-                    }
-                }
-            }
-            var ip = addresses[0];
-            var octets = ip.split('.');
-            octets.pop();
-            octets = octets.concat('1-254');
-            var range = octets.join('.');
-            _super.call(this, range, '-sV -O');
-        }
-        return autoDiscover;
-    })(NmapScan);
-    nodenmap.autoDiscover = autoDiscover;
-    var queuedScan = (function (_super) {
-        __extends(queuedScan, _super);
-        function queuedScan(range, action) {
+    nodenmap.OsAndPortScan = OsAndPortScan;
+    // export class autoDiscover extends NmapScan {
+    //     constructor() {
+    //         var interfaces = os.networkInterfaces();
+    //         var addresses = [];
+    //         for (var k in interfaces) {
+    //             for (var k2 in interfaces[k]) {
+    //                 var address = interfaces[k][k2];
+    //                 if (address.family === 'IPv4' && !address.internal) {
+    //                     addresses.push(address.address);
+    //                 }
+    //             }
+    //         }
+    //         var ip = addresses[0];
+    //         var octets = ip.split('.');
+    //         octets.pop();
+    //         octets = octets.concat('1-254');
+    //         var range = octets.join('.');
+    //         super(range, '-sV -O');
+    //     }
+    // }
+    var QueuedScan = (function (_super) {
+        __extends(QueuedScan, _super);
+        function QueuedScan(scanClass, range, args, action) {
             var _this = this;
             if (action === void 0) { action = function () { }; }
             _super.call(this);
             this.scanResults = [];
+            this.scanTime = 0;
+            this.runActionOnError = false;
+            this.saveErrorsToResults = false;
+            this.singleScanTimeout = 0;
+            this.saveNotFoundToResults = false;
             this._queue = new Queue(function (host) {
-                var scan = new quickScan(host);
-                scan.on('complete', function (data) {
-                    _this.scanResults = _this.scanResults.concat(data);
+                if (args !== null) {
+                    _this.currentScan = new scanClass(host, args);
+                }
+                else {
+                    _this.currentScan = new scanClass(host);
+                }
+                if (_this.singleScanTimeout !== 0) {
+                    _this.currentScan.scanTimeout = _this.singleScanTimeout;
+                }
+                _this.currentScan.on('complete', function (data) {
+                    _this.scanTime += _this.currentScan.scanTime;
+                    if (data[0]) {
+                        data[0].scanTime = _this.currentScan.scanTime;
+                        _this.scanResults = _this.scanResults.concat(data);
+                    }
+                    else if (_this.saveNotFoundToResults) {
+                        data[0] = {
+                            error: "Host not found",
+                            scanTime: _this.currentScan.scanTime
+                        };
+                        _this.scanResults = _this.scanResults.concat(data);
+                    }
                     action(data);
                     _this._queue.done();
                 });
-                scan.startScan();
+                _this.currentScan.on('error', function (err) {
+                    _this.scanTime += _this.currentScan.scanTime;
+                    var data = { error: err, scanTime: _this.currentScan.scanTime };
+                    if (_this.saveErrorsToResults) {
+                        _this.scanResults = _this.scanResults.concat(data);
+                    }
+                    if (_this.runActionOnError) {
+                        action(data);
+                    }
+                    _this._queue.done();
+                });
+                _this.currentScan.startScan();
             });
             this._queue.add(this.rangeFormatter(range));
             this._queue.on('complete', function () {
                 _this.emit('complete', _this.scanResults);
             });
         }
-        queuedScan.prototype.rangeFormatter = function (range) {
+        QueuedScan.prototype.rangeFormatter = function (range) {
             var outputRange = [];
             if (!Array.isArray(range)) {
                 range = range.split(' ');
@@ -273,40 +330,40 @@ var nodenmap;
             }
             return outputRange;
         };
-        queuedScan.prototype.startRunScan = function (index) {
+        QueuedScan.prototype.startRunScan = function (index) {
             if (index === void 0) { index = 0; }
             this.scanResults = [];
             this._queue.run(0);
         };
-        queuedScan.prototype.startShiftScan = function () {
+        QueuedScan.prototype.startShiftScan = function () {
             this.scanResults = [];
             this._queue.shiftRun();
         };
-        queuedScan.prototype.pause = function () {
+        QueuedScan.prototype.pause = function () {
             this._queue.pause();
         };
-        queuedScan.prototype.resume = function () {
+        QueuedScan.prototype.resume = function () {
             this._queue.resume();
         };
-        queuedScan.prototype.next = function (iterations) {
+        QueuedScan.prototype.next = function (iterations) {
             if (iterations === void 0) { iterations = 1; }
             return this._queue.next(iterations);
         };
-        queuedScan.prototype.shift = function (iterations) {
+        QueuedScan.prototype.shift = function (iterations) {
             if (iterations === void 0) { iterations = 1; }
             return this._queue.shift(iterations);
         };
-        queuedScan.prototype.results = function () {
+        QueuedScan.prototype.results = function () {
             return this.scanResults;
         };
-        queuedScan.prototype.shiftResults = function () {
+        QueuedScan.prototype.shiftResults = function () {
             this._queue.shiftResults();
             return this.scanResults.shift();
         };
-        queuedScan.prototype.index = function () {
+        QueuedScan.prototype.index = function () {
             return this._queue.index();
         };
-        queuedScan.prototype.queue = function (newQueue) {
+        QueuedScan.prototype.queue = function (newQueue) {
             if (Array.isArray(newQueue)) {
                 return this._queue.queue(newQueue);
             }
@@ -314,12 +371,39 @@ var nodenmap;
                 return this._queue.queue();
             }
         };
-        queuedScan.prototype.percentComplete = function () {
+        QueuedScan.prototype.percentComplete = function () {
             return Math.round(((this._queue.index() + 1) / this._queue.queue().length) * 100);
         };
-        return queuedScan;
+        return QueuedScan;
     })(events.EventEmitter);
-    nodenmap.queuedScan = queuedScan;
+    nodenmap.QueuedScan = QueuedScan;
+    var QueuedNmapScan = (function (_super) {
+        __extends(QueuedNmapScan, _super);
+        function QueuedNmapScan(range, additionalArguments, actionFunction) {
+            if (actionFunction === void 0) { actionFunction = function () { }; }
+            _super.call(this, NmapScan, range, additionalArguments, actionFunction);
+        }
+        return QueuedNmapScan;
+    })(QueuedScan);
+    nodenmap.QueuedNmapScan = QueuedNmapScan;
+    var QueuedQuickScan = (function (_super) {
+        __extends(QueuedQuickScan, _super);
+        function QueuedQuickScan(range, actionFunction) {
+            if (actionFunction === void 0) { actionFunction = function () { }; }
+            _super.call(this, QuickScan, range, null, actionFunction);
+        }
+        return QueuedQuickScan;
+    })(QueuedScan);
+    nodenmap.QueuedQuickScan = QueuedQuickScan;
+    var QueuedOsAndPortScan = (function (_super) {
+        __extends(QueuedOsAndPortScan, _super);
+        function QueuedOsAndPortScan(range, actionFunction) {
+            if (actionFunction === void 0) { actionFunction = function () { }; }
+            _super.call(this, OsAndPortScan, range, null, actionFunction);
+        }
+        return QueuedOsAndPortScan;
+    })(QueuedScan);
+    nodenmap.QueuedOsAndPortScan = QueuedOsAndPortScan;
 })(nodenmap = exports.nodenmap || (exports.nodenmap = {}));
 exports = nodenmap;
 //# sourceMappingURL=index.js.map

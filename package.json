@@ -1,6 +1,6 @@
 {
   "name": "node-nmap",
-  "version": "2.0.1",
+  "version": "3.0.0",
   "description": "Interfaces with locally installed NMAP",
   "main": "index.js",
   "scripts": {
@@ -29,7 +29,7 @@
   ],
   "homepage": "https://github.com/Johnhhorton/node-nmap#readme",
   "dependencies": {
-    "queued-up": "^2.0.1",
+    "queued-up": "*",
     "xml2js": "^0.4.15"
   },
   "devDependencies": {

@@ -23,6 +23,8 @@ export module nodenmap {
         mac: any;
         openPorts: Array<port>;
         osNmap: string;
+        scanTime?:number;
+        error?:string;
     }
     export interface port {
         port: number;
@@ -34,19 +36,34 @@ export module nodenmap {
 
         command: string[] = [];
         private nmapoutputXML: string = "";
+        private timer;
         range: string[] = [];
         arguments: string[] = ['-oX', '-'];
         rawData: string = '';
         rawJSON: any;
         child: any;
+        cancelled:boolean = false;
+        scanTime: number = 0;
         error: string = null;
         scanResults: host[];
+        scanTimeout: number = 0;
         constructor(range: any, inputArguments?: any) {
             super();
             this.commandConstructor(range, inputArguments);
             this.initializeChildProcess();
         }
-
+        private startTimer(){
+            
+            this.timer = setInterval(()=>{
+                this.scanTime += 10;
+                if(this.scanTime >= this.scanTimeout && this.scanTimeout !== 0){
+                    this.killChild();
+                }
+            },10);
+        }
+        private stopTimer(){
+            clearInterval(this.timer);
+        }
         private commandConstructor(range: any, additionalArguments?: any) {
             if (additionalArguments) {
                 if (!Array.isArray(additionalArguments)) {
@@ -63,22 +80,20 @@ export module nodenmap {
             this.range = range;
             this.command = this.command.concat(this.range);
         }
+        private killChild(){
+            this.cancelled = true;
+            this.child.kill();
+        }
         private initializeChildProcess() {
+            this.startTimer();
             this.child = spawn(nmapLocation, this.command);
-
-            process.on('SIGINT', () => {
-                this.child.kill();
-            });
-            process.on('uncaughtException', (err) => {
-                this.child.kill();
-            });
-            process.on('exit', () => {
-                this.child.kill();
-            });
+            process.on('SIGINT', this.killChild);
+            process.on('uncaughtException', this.killChild);
+            process.on('exit', this.killChild);
             this.child.stdout.on("data", (data) => {
                 if (data.indexOf("percent") > -1) {
                     console.log(data.toString());
-                } else {
+                }else{
                     this.rawData += data;
                 }
 
@@ -86,11 +101,19 @@ export module nodenmap {
 
             this.child.stderr.on("data", (err) => {
                 this.error = err.toString();
+                console.log("error found:" + this.error);
             });
 
             this.child.on("close", () => {
+                
+                process.removeListener('SIGINT',this.killChild);
+                process.removeListener('uncaughtException',this.killChild);
+                process.removeListener('exit',this.killChild);
+                
                 if (this.error) {
                     this.emit('error', this.error);
+                } else if(this.cancelled === true){
+                    this.emit('error', "Over scan timeout " + this.scanTimeout);
                 } else {
                     this.rawDataHandler(this.rawData);
                 }
@@ -99,8 +122,13 @@ export module nodenmap {
         startScan() {
             this.child.stdin.end();
         }
-        scanComplete(results: host[]) {
+        cancelScan(){
+            this.killChild();
+            this.emit('error', "Scan cancelled");
+        }
+        private scanComplete(results: host[]) {
             this.scanResults = results;
+            this.stopTimer();
             this.emit('complete', this.scanResults);
         }
         private rawDataHandler(data) {
@@ -112,9 +140,9 @@ export module nodenmap {
                 } else {
                     this.rawJSON = result;
                     results = this.convertRawJsonToScanResults(this.rawJSON, (err) => {
-                         console.log(this.rawJSON);
+                        console.log(this.rawJSON);
                         this.emit('error', "Error converting raw json to cleans can results: " + err + ": " + this.rawJSON);
-                       
+
                     });
                     this.scanComplete(results);
                 }
@@ -188,83 +216,131 @@ export module nodenmap {
             }
         }
     }
-    export class quickScan extends NmapScan {
+    export class QuickScan extends NmapScan {
         constructor(range: any) {
             super(range, '-sP');
         }
     }
-    export class osAndPortScan extends NmapScan {
+    export class OsAndPortScan extends NmapScan {
         constructor(range: any) {
             super(range, '-O');
         }
     }
-    export class autoDiscover extends NmapScan {
-        constructor() {
-            var interfaces = os.networkInterfaces();
-            var addresses = [];
-            for (var k in interfaces) {
-                for (var k2 in interfaces[k]) {
-                    var address = interfaces[k][k2];
-                    if (address.family === 'IPv4' && !address.internal) {
-                        addresses.push(address.address);
-                    }
-                }
-            }
-            var ip = addresses[0];
-            var octets = ip.split('.');
-            octets.pop();
-            octets = octets.concat('1-254');
-            var range = octets.join('.');
-            super(range, '-sV -O');
-        }
-    }
-    export class queuedScan extends events.EventEmitter {
-        private _queue: Queue
-        scanResults: host[] = []
-        constructor(range: any, action:Function = ()=>{}) {
+    // export class autoDiscover extends NmapScan {
+    //     constructor() {
+    //         var interfaces = os.networkInterfaces();
+    //         var addresses = [];
+    //         for (var k in interfaces) {
+    //             for (var k2 in interfaces[k]) {
+    //                 var address = interfaces[k][k2];
+    //                 if (address.family === 'IPv4' && !address.internal) {
+    //                     addresses.push(address.address);
+    //                 }
+    //             }
+    //         }
+    //         var ip = addresses[0];
+    //         var octets = ip.split('.');
+    //         octets.pop();
+    //         octets = octets.concat('1-254');
+    //         var range = octets.join('.');
+    //         super(range, '-sV -O');
+    //     }
+    // }
+    
+    
+
+    export class QueuedScan extends events.EventEmitter {
+        private _queue: Queue;
+        scanResults: host[] = [];
+        scanTime: number = 0;
+        currentScan;
+        runActionOnError: boolean = false;
+        saveErrorsToResults: boolean = false;
+        singleScanTimeout: number = 0;
+        saveNotFoundToResults: boolean = false;
+        constructor(scanClass: any, range: any, args: any[], action: Function = () => { }) {
             super();
-            
+
+
             this._queue = new Queue((host) => {
-                var scan = new quickScan(host)
-                
-                scan.on('complete', (data) => {
-                    this.scanResults = this.scanResults.concat(data);
-                   action(data);
+
+                if (args !== null) {
+                    this.currentScan = new scanClass(host, args);
+                } else {
+                    this.currentScan = new scanClass(host);
+                }
+                if(this.singleScanTimeout !== 0){
+                    this.currentScan.scanTimeout = this.singleScanTimeout;
+                }
+
+                this.currentScan.on('complete', (data) => {
+                    this.scanTime += this.currentScan.scanTime;
+                    if(data[0]){
+                        data[0].scanTime = this.currentScan.scanTime;
+                        this.scanResults = this.scanResults.concat(data);
+                    }else if(this.saveNotFoundToResults){
+                            data[0] = {
+                                error: "Host not found",
+                                scanTime: this.currentScan.scanTime
+                            }
+                            this.scanResults = this.scanResults.concat(data);
+                        
+                    }
+                    
+                    
+                    
+                    action(data);
                     this._queue.done();
                 });
-                
-                scan.startScan();
+                this.currentScan.on('error', (err) => {
+                    this.scanTime += this.currentScan.scanTime;
+                    
+                    var data = {error: err, scanTime: this.currentScan.scanTime}
+                    
+                    
+                    if(this.saveErrorsToResults){
+                        this.scanResults = this.scanResults.concat(data);
+                    }
+                    if(this.runActionOnError){
+                        action(data);    
+                    }
+                    
+                    this._queue.done();
+                });
+
+                this.currentScan.startScan();
             });
 
             this._queue.add(this.rangeFormatter(range));
-            
+
             this._queue.on('complete', () => {
                 this.emit('complete', this.scanResults);
+                
             });
         }
-        
-        private rangeFormatter(range){
+
+        private rangeFormatter(range) {
             var outputRange = [];
             if (!Array.isArray(range)) {
                 range = range.split(' ');
             }
-            
+
             for (var i = 0; i < range.length; i++) {
                 var input = range[i];
-                var temprange = range[i]; 
-                if(countCharacterOccurence(input, ".") === 3
-                && !input.match(/^[a-zA-Z]+$/)
-                && input.match(new RegExp("-","g")).length === 1
-                ){
+                var temprange = range[i];
+                if (countCharacterOccurence(input, ".") === 3
+                    && !input.match(/^[a-zA-Z]+$/)
+                    && input.match(new RegExp("-", "g")).length === 1
+                ) {
                     var firstIP = input.slice(0, input.indexOf("-"));
                     var network;
-                    var lastNumber = input.slice(input.indexOf("-")+1);
+                    var lastNumber = input.slice(input.indexOf("-") + 1);
                     var firstNumber;
-                    var newRange =[];
-                    for (var j = firstIP.length -1; j > -1; j--) {
-                        if(firstIP.charAt(j) === "."){
-                            firstNumber = firstIP.slice(j+1);
-                            network = firstIP.slice(0,j+1);
+                    var newRange = [];
+                    for (var j = firstIP.length - 1; j > -1; j--) {
+                        if (firstIP.charAt(j) === ".") {
+                            firstNumber = firstIP.slice(j + 1);
+                            network = firstIP.slice(0, j + 1);
                             break;
                         }
                     }
@@ -276,10 +352,10 @@ export module nodenmap {
                 }
                 outputRange = outputRange.concat(temprange);
             }
-            function countCharacterOccurence(input, character){
+            function countCharacterOccurence(input, character) {
                 var num = 0;
                 for (var k = 0; k < input.length; k++) {
-                    if(input.charAt(k) === character){
+                    if (input.charAt(k) === character) {
                         num++;
                     }
                 }
@@ -321,13 +397,28 @@ export module nodenmap {
 
             if (Array.isArray(newQueue)) {
                 return this._queue.queue(newQueue);
-                
+
             } else {
                 return this._queue.queue();
             }
         }
-        percentComplete(){
-            return Math.round(((this._queue.index()+1) / this._queue.queue().length) *100);
+        percentComplete() {
+            return Math.round(((this._queue.index() + 1) / this._queue.queue().length) * 100);
+        }
+    }
+    export class QueuedNmapScan extends QueuedScan {
+        constructor(range: any, additionalArguments?: any, actionFunction: Function = () => { }) {
+            super(NmapScan, range, additionalArguments, actionFunction);
+        }
+    }
+    export class QueuedQuickScan extends QueuedScan {
+        constructor(range: any, actionFunction: Function = () => { }) {
+            super(QuickScan, range, null, actionFunction);
+        }
+    }
+    export class QueuedOsAndPortScan extends QueuedScan {
+        constructor(range: any, actionFunction: Function = () => { }) {
+            super(OsAndPortScan, range, null, actionFunction);
         }
     }
 }

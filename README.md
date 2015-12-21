@@ -2,19 +2,62 @@
 # Node-NMAP
 NPM package enabling your [NodeJs] application to interface with the features of [NMAP].  This package requires that [NMAP] is installed and available to the running node application.
 
-UPDATE: I have rewritten the module in TypeScript.  the .d.ts file is located at /node_modules/node-nmap/index.d.ts.
+UPDATE v3: A lot of changes have come in this update:
+* Breaking change: All scan classes are now capitalized.
+* Added `scan.scanTimeout` to limit long running scans
+* Added `scan.scanTime` representing the duration of the scan
+* Added `scan.cancelScan()` to kill a running scan
+* Removed `autoDiscover` scan type until method of determining useful interfaces found
+* Bugfix: Now remove listeners for SIGINT when a scan is complete.
+* Added a Queued version of each scan allowing for a highler level of feedback and control over the scanning process.
+* Building against the latest version of NMAP (v7)
+
+UPDATE v2: I have rewritten the module in TypeScript.  the .d.ts file is located at /node_modules/node-nmap/index.d.ts.
 As a part of this update, there is an additional maping for the namespace/module, as well as a requirement to use `new` for each scan.
 
-Request:  While NmapScan() will accept valid NMAP arguments, the XML to JSON conversion is only checking for specific things.  If there is a common or useful NMAP feature that you would like to see included, please submit an issue and I will work it in.
+Request:  While `NmapScan()` will accept valid NMAP arguments, the XML to JSON conversion is only checking for specific things.  If there is a common or useful NMAP feature that you would like to see included, please submit an issue and I will work it in.
 
 ## Installation
 `npm install node-nmap`
 
-## Methods
-* NmapScan - This is the core of the package and runs the NMAP command.
-* quickScan - Scans supplied hosts without portscan(-sn).  Use for a quick discovery.
-* osAndPortScan - Scans for open ports as well as NMAP gathered OS information.
-* autoDiscover  - scans as a /24 network range for the local network.  \[only /24 currently, and only finds first interface\]
+## Scan Types
+* `NmapScan` - This is the core of the package and runs the NMAP command.
+* `QuickScan` - Scans supplied hosts without portscan(-sP).  Use for a quick discovery.
+* `OsAndPortScan` - Scans for open ports as well as NMAP gathered OS information.
+* `QueuedNmapScan` - Queued version for greater control
+* `QueuedQuickScan` - Queued version for greater control
+* `QueuedOsAndPortScan` - Queued version for greater control
+ 
+## Scan instance variables, methods, and events
+
+* `scanResults` : Array of host objects - contains the results of the scan.
+* `scanTime` : number in ms - duration of scan.
+* `scanTimeout` : number in ms - scan will cancel if timeout is reached.
+* `startScan()` - begins the NMAP scan.
+* `cancelScan()` - kills the NMAP process.
+* `'complete'` : event - returns array of host objects
+* `'error'` : event - returns string with error information
+
+## Queued scans instance variables, methods, and events
+
+* `scanTime` : number in ms - collective duration of all scans. 
+* `currentScan` - reference to the current scan object if needed
+* `runActiononError` : boolean(default:false) - run the supplied action function when an error is encountered.
+* `saveErrorsToResults` : boolean(default:false) - save error data to the results array
+* `singleScanTimeout` : number in ms - timeout value to be supplied to eachs single scan.
+* `saveNotFoundToResults` : boolean(default:false) - save host not found error object to results array
+* `startRunScan()` - begins processing the entire queue without removing scanned hosts.
+* `startShiftScan()` - begins processing entire queue while removing scanned hosts.
+* `pause()` - pauses the queue processing (take affect between scans.).
+* `resume()` - resumes processing the queue.
+* `next(count)` - processes the next `count` queued items.  Default 1. 
+* `shift(count)` - processes the next `count` queued items while removing them from the queue.  Default 1.
+* `results()` - returns Array of current scan result Host objects.
+* `shiftResults()` - returns the first item of the results objects and removes it from the results list.
+* `index()` - returns the current index of the queue processing
+* `percentComplete()` - returns the percentage completion through the processing queue.
+* `'complete'` : event - triggers when entire queue has been processed.  Returns results Array.
+* `'error'` : event - triggers when an error is encountered.  Returns error object.
 
 ## Usage
 
@@ -34,7 +77,7 @@ The return structure is:
              "service":"http"
           },...  
         ],
-       "osNmap":null //note that osNmap is not guaranteed to be correct.
+       "osNmap":null, //note that osNmap is not guaranteed to be correct.
     },...]
 ```
 ### Examples
@@ -45,7 +88,7 @@ var nmap = require('node-nmap');
 nmap.nodenmap.nmapLocation = "nmap"; //default
 
 //    Accepts array or comma separated string of NMAP acceptable hosts
-var quickscan = new nmap.nodenmap.quickScan('127.0.0.1 google.com');
+var quickscan = new nmap.nodenmap.QuickScan('127.0.0.1 google.com');
 
 quickscan.on('complete', function(data){
   console.log(data);
@@ -112,7 +155,7 @@ nmapscan.startScan();
 //       "osNmap":null
 //    }
 // ]
-var osandports = new nmap.nodenmap.osAndPortScan('google.com');
+var osandports = new nmap.nodenmap.OsAndPortScan('google.com');
 
 osandports.on('complete',function(data){
   console.log(data);
@@ -142,18 +185,40 @@ osandports.startScan();
 //       "osNmap":"OpenBSD 4.3"
 //    }
 // ]
-var discover = new nmap.nodenmap.autoDiscover();
 
-discover.on('complete',function(data){
-  console.log(data);
+```
+
+
+## Queued Scans
+
+Queued scanning was implemented to give higher level of control over the scanning process.
+While there are advantages, using the Queued scanning method does produce time overhead as a new instance
+of NMAP is created for each host.  It may be useful to use Queued scans in the event that you are running
+a lengthy set of long running scans on each host.  It would be recommended to perform a quickscan, before
+supplying the found hosts to a queued scanning process for longer running scans.
+
+### Example
+```javascript
+//the actionFunction gets run each time a scan on a host is complete
+function actionFunction(data){
+    console.log(data);
+	console.log("Percentage complete" + scan.percentComplete());
+}
+var scan = new nmap.nodenmap.QueuedOsAndPortScan("google.com 192.168.0.1-10", actionFunction);
+
+scan.on('complete', function(data){
+	console.log(data);
+    console.log("total scan time" + scan.scanTime);
 });
-discover.on('error', function(error){
+
+scan.on('error', function(error){
   console.log(error);
 });
 
-discover.startScan();
-
+scan.startRunScan(); //processes entire queue
 ```
+
+Please open an issue if you have any questions, concerns, bugs, or critiques.
 
 [NMAP]: <https://nmap.org/>
 [NPM]: <https://www.npmjs.com/>

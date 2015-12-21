@@ -7,6 +7,8 @@ export declare module nodenmap {
         mac: any;
         openPorts: Array<port>;
         osNmap: string;
+        scanTime?: number;
+        error?: string;
     }
     interface port {
         port: number;
@@ -16,34 +18,45 @@ export declare module nodenmap {
     class NmapScan extends events.EventEmitter {
         command: string[];
         private nmapoutputXML;
+        private timer;
         range: string[];
         arguments: string[];
         rawData: string;
         rawJSON: any;
         child: any;
+        cancelled: boolean;
+        scanTime: number;
         error: string;
         scanResults: host[];
+        scanTimeout: number;
         constructor(range: any, inputArguments?: any);
+        private startTimer();
+        private stopTimer();
         private commandConstructor(range, additionalArguments?);
+        private killChild();
         private initializeChildProcess();
         startScan(): void;
-        scanComplete(results: host[]): void;
+        cancelScan(): void;
+        private scanComplete(results);
         private rawDataHandler(data);
         private convertRawJsonToScanResults(xmlInput, onFailure);
     }
-    class quickScan extends NmapScan {
+    class QuickScan extends NmapScan {
         constructor(range: any);
     }
-    class osAndPortScan extends NmapScan {
+    class OsAndPortScan extends NmapScan {
         constructor(range: any);
     }
-    class autoDiscover extends NmapScan {
-        constructor();
-    }
-    class queuedScan extends events.EventEmitter {
+    class QueuedScan extends events.EventEmitter {
         private _queue;
         scanResults: host[];
-        constructor(range: any, action?: Function);
+        scanTime: number;
+        currentScan: any;
+        runActionOnError: boolean;
+        saveErrorsToResults: boolean;
+        singleScanTimeout: number;
+        saveNotFoundToResults: boolean;
+        constructor(scanClass: any, range: any, args: any[], action?: Function);
         private rangeFormatter(range);
         startRunScan(index?: number): void;
         startShiftScan(): void;
@@ -56,5 +69,14 @@ export declare module nodenmap {
         index(): any;
         queue(newQueue?: any[]): any[];
         percentComplete(): number;
+    }
+    class QueuedNmapScan extends QueuedScan {
+        constructor(range: any, additionalArguments?: any, actionFunction?: Function);
+    }
+    class QueuedQuickScan extends QueuedScan {
+        constructor(range: any, actionFunction?: Function);
+    }
+    class QueuedOsAndPortScan extends QueuedScan {
+        constructor(range: any, actionFunction?: Function);
     }
 }
