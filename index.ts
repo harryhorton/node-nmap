@@ -329,9 +329,10 @@ export module nodenmap {
                 var input = range[i];
                 var temprange = range[i];
                 if (countCharacterOccurence(input, ".") === 3
+                    && input.match(new RegExp("-", "g")) !== null
                     && !input.match(/^[a-zA-Z]+$/)
-                    && input.match(new RegExp("-", "g")).length === 1
-                ) {
+                    && input.match(new RegExp("-", "g")).length === 1 
+                    ) {
                     var firstIP = input.slice(0, input.indexOf("-"));
                     var network;
                     var lastNumber = input.slice(input.indexOf("-") + 1);
