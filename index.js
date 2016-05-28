@@ -173,7 +173,9 @@ var nodenmap;
                                 //Get the port number
                                 tempHostList[hostLoopIter].openPorts[portLoopIter].port = parseInt(xmlInput[hostLoopIter]["ports"][0]["port"][portLoopIter]['$']['portid']);
                                 //Get the port name
-                                tempHostList[hostLoopIter].openPorts[portLoopIter].service = xmlInput[hostLoopIter]["ports"][0]["port"][portLoopIter]['service'][0]['$']['name'];
+                                if (xmlInput[hostLoopIter]["ports"][0]["port"][portLoopIter]['service']) {
+                                    tempHostList[hostLoopIter].openPorts[portLoopIter].service = xmlInput[hostLoopIter]["ports"][0]["port"][portLoopIter]['service'][0]['$']['name'];
+                                }
                             }
                         }
                     }
