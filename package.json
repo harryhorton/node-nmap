@@ -1,6 +1,6 @@
 {
   "name": "node-nmap",
-  "version": "3.0.1",
+  "version": "3.0.2",
   "description": "Interfaces with locally installed NMAP",
   "main": "index.js",
   "scripts": {
