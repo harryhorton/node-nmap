@@ -158,7 +158,6 @@ export module nodenmap {
             };
             try {
                 xmlInput = xmlInput['nmaprun']['host'];
-
                 //Create a new object for each host found
                 for (var hostLoopIter = 0; hostLoopIter < xmlInput.length; hostLoopIter++) {
 
@@ -181,6 +180,8 @@ export module nodenmap {
                             tempHostList[hostLoopIter].ip = xmlInput[hostLoopIter]["address"][addressLoopIter]["$"]["addr"];
                         } else if (xmlInput[hostLoopIter]["address"][addressLoopIter]["$"]["addrtype"] === 'mac') {
                             tempHostList[hostLoopIter].mac = xmlInput[hostLoopIter]["address"][addressLoopIter]["$"]["addr"];
+                            tempHostList[hostLoopIter].vendor = xmlInput[hostLoopIter]["address"][addressLoopIter]["$"]["vendor"];
+
                         } else {
 
                         }

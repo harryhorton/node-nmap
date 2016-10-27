@@ -159,6 +159,7 @@ var nodenmap;
                         }
                         else if (xmlInput[hostLoopIter]["address"][addressLoopIter]["$"]["addrtype"] === 'mac') {
                             tempHostList[hostLoopIter].mac = xmlInput[hostLoopIter]["address"][addressLoopIter]["$"]["addr"];
+                            tempHostList[hostLoopIter].vendor = xmlInput[hostLoopIter]["address"][addressLoopIter]["$"]["vendor"];
                         }
                         else {
                         }

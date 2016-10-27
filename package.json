@@ -1,6 +1,6 @@
 {
   "name": "node-nmap",
-  "version": "3.0.1",
+  "version": "3.0.3",
   "description": "Interfaces with locally installed NMAP",
   "main": "index.js",
   "scripts": {
@@ -15,7 +15,10 @@
     "network",
     "scan"
   ],
-  "typing":["./index.d.ts","./typings/node/node.d.ts"],
+  "typing": [
+    "./index.d.ts",
+    "./typings/node/node.d.ts"
+  ],
   "author": "John H Horton",
   "license": "MIT",
   "bugs": {
@@ -29,7 +32,7 @@
   ],
   "homepage": "https://github.com/Johnhhorton/node-nmap#readme",
   "dependencies": {
-    "queued-up": "*",
+    "queued-up": "^2.0.2",
     "xml2js": "^0.4.15"
   },
   "devDependencies": {
