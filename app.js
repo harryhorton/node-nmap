@@ -7,5 +7,9 @@ scan.on('complete', function (data) {
     console.log(data);
     console.log("total scan time" + scan.scanTime);
 });
+scan.on('error', function (data) {
+    console.log(data);
+    console.log("total scan time" + scan.scanTime);
+});
 scan.startScan();
 //# sourceMappingURL=app.js.map

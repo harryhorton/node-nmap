@@ -23,8 +23,8 @@ export module nodenmap {
         mac: any;
         openPorts: Array<port>;
         osNmap: string;
-        scanTime?:number;
-        error?:string;
+        scanTime?: number;
+        error?: string;
     }
     export interface port {
         port: number;
@@ -42,7 +42,7 @@ export module nodenmap {
         rawData: string = '';
         rawJSON: any;
         child: any;
-        cancelled:boolean = false;
+        cancelled: boolean = false;
         scanTime: number = 0;
         error: string = null;
         scanResults: host[];
@@ -52,16 +52,16 @@ export module nodenmap {
             this.commandConstructor(range, inputArguments);
             this.initializeChildProcess();
         }
-        private startTimer(){
-            
-            this.timer = setInterval(()=>{
+        private startTimer() {
+
+            this.timer = setInterval(() => {
                 this.scanTime += 10;
-                if(this.scanTime >= this.scanTimeout && this.scanTimeout !== 0){
+                if (this.scanTime >= this.scanTimeout && this.scanTimeout !== 0) {
                     this.killChild();
                 }
-            },10);
+            }, 10);
         }
-        private stopTimer(){
+        private stopTimer() {
             clearInterval(this.timer);
         }
         private commandConstructor(range: any, additionalArguments?: any) {
@@ -80,9 +80,12 @@ export module nodenmap {
             this.range = range;
             this.command = this.command.concat(this.range);
         }
-        private killChild(){
+        private killChild() {
             this.cancelled = true;
-            this.child.kill();
+            if (this.child) {
+                this.child.kill();
+
+            }
         }
         private initializeChildProcess() {
             this.startTimer();
@@ -92,27 +95,34 @@ export module nodenmap {
             process.on('exit', this.killChild);
             this.child.stdout.on("data", (data) => {
                 if (data.indexOf("percent") > -1) {
-                    console.log(data.toString());
-                }else{
+                    // console.log(data.toString());
+                } else {
                     this.rawData += data;
                 }
 
             });
+            this.child.on('error', (err) => {
+                this.killChild();
+                if (err.code === 'ENOENT') {
+                    this.emit('error', 'NMAP not found at command location: ' + nmapLocation)
+                }else{
+                    this.emit('error', err.Error)
+                }
+
+            })
 
             this.child.stderr.on("data", (err) => {
                 this.error = err.toString();
-                console.log("error found:" + this.error);
             });
 
             this.child.on("close", () => {
-                
-                process.removeListener('SIGINT',this.killChild);
-                process.removeListener('uncaughtException',this.killChild);
-                process.removeListener('exit',this.killChild);
-                
+                process.removeListener('SIGINT', this.killChild);
+                process.removeListener('uncaughtException', this.killChild);
+                process.removeListener('exit', this.killChild);
+
                 if (this.error) {
                     this.emit('error', this.error);
-                } else if(this.cancelled === true){
+                } else if (this.cancelled === true) {
                     this.emit('error', "Over scan timeout " + this.scanTimeout);
                 } else {
                     this.rawDataHandler(this.rawData);
@@ -120,9 +130,9 @@ export module nodenmap {
             });
         }
         startScan() {
-            this.child.stdin.end();
+                this.child.stdin.end();
         }
-        cancelScan(){
+        cancelScan() {
             this.killChild();
             this.emit('error', "Scan cancelled");
         }
@@ -140,9 +150,7 @@ export module nodenmap {
                 } else {
                     this.rawJSON = result;
                     results = this.convertRawJsonToScanResults(this.rawJSON, (err) => {
-                        console.log(this.rawJSON);
                         this.emit('error', "Error converting raw json to cleans can results: " + err + ": " + this.rawJSON);
-
                     });
                     this.scanComplete(results);
                 }
@@ -249,8 +257,8 @@ export module nodenmap {
     //         super(range, '-sV -O');
     //     }
     // }
-    
-    
+
+
 
     export class QueuedScan extends events.EventEmitter {
         private _queue: Queue;
@@ -272,42 +280,42 @@ export module nodenmap {
                 } else {
                     this.currentScan = new scanClass(host);
                 }
-                if(this.singleScanTimeout !== 0){
+                if (this.singleScanTimeout !== 0) {
                     this.currentScan.scanTimeout = this.singleScanTimeout;
                 }
 
                 this.currentScan.on('complete', (data) => {
                     this.scanTime += this.currentScan.scanTime;
-                    if(data[0]){
+                    if (data[0]) {
                         data[0].scanTime = this.currentScan.scanTime;
                         this.scanResults = this.scanResults.concat(data);
-                    }else if(this.saveNotFoundToResults){
-                            data[0] = {
-                                error: "Host not found",
-                                scanTime: this.currentScan.scanTime
-                            }
-                            this.scanResults = this.scanResults.concat(data);
-                        
+                    } else if (this.saveNotFoundToResults) {
+                        data[0] = {
+                            error: "Host not found",
+                            scanTime: this.currentScan.scanTime
+                        }
+                        this.scanResults = this.scanResults.concat(data);
+
                     }
-                    
-                    
-                    
+
+
+
                     action(data);
                     this._queue.done();
                 });
                 this.currentScan.on('error', (err) => {
                     this.scanTime += this.currentScan.scanTime;
-                    
-                    var data = {error: err, scanTime: this.currentScan.scanTime}
-                    
-                    
-                    if(this.saveErrorsToResults){
+
+                    var data = { error: err, scanTime: this.currentScan.scanTime }
+
+
+                    if (this.saveErrorsToResults) {
                         this.scanResults = this.scanResults.concat(data);
                     }
-                    if(this.runActionOnError){
-                        action(data);    
+                    if (this.runActionOnError) {
+                        action(data);
                     }
-                    
+
                     this._queue.done();
                 });
 
@@ -318,7 +326,7 @@ export module nodenmap {
 
             this._queue.on('complete', () => {
                 this.emit('complete', this.scanResults);
-                
+
             });
         }
 
@@ -334,8 +342,8 @@ export module nodenmap {
                 if (countCharacterOccurence(input, ".") === 3
                     && input.match(new RegExp("-", "g")) !== null
                     && !input.match(/^[a-zA-Z]+$/)
-                    && input.match(new RegExp("-", "g")).length === 1 
-                    ) {
+                    && input.match(new RegExp("-", "g")).length === 1
+                ) {
                     var firstIP = input.slice(0, input.indexOf("-"));
                     var network;
                     var lastNumber = input.slice(input.indexOf("-") + 1);

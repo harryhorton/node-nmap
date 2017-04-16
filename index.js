@@ -63,7 +63,9 @@ var nodenmap;
         };
         NmapScan.prototype.killChild = function () {
             this.cancelled = true;
-            this.child.kill();
+            if (this.child) {
+                this.child.kill();
+            }
         };
         NmapScan.prototype.initializeChildProcess = function () {
             var _this = this;
@@ -74,15 +76,22 @@ var nodenmap;
             process.on('exit', this.killChild);
             this.child.stdout.on("data", function (data) {
                 if (data.indexOf("percent") > -1) {
-                    console.log(data.toString());
                 }
                 else {
                     _this.rawData += data;
                 }
             });
+            this.child.on('error', function (err) {
+                _this.killChild();
+                if (err.code === 'ENOENT') {
+                    _this.emit('error', 'NMAP not found at command location: ' + nodenmap.nmapLocation);
+                }
+                else {
+                    _this.emit('error', err.Error);
+                }
+            });
             this.child.stderr.on("data", function (err) {
                 _this.error = err.toString();
-                console.log("error found:" + _this.error);
             });
             this.child.on("close", function () {
                 process.removeListener('SIGINT', _this.killChild);
@@ -122,7 +131,6 @@ var nodenmap;
                 else {
                     _this.rawJSON = result;
                     results = _this.convertRawJsonToScanResults(_this.rawJSON, function (err) {
-                        console.log(_this.rawJSON);
                         _this.emit('error', "Error converting raw json to cleans can results: " + err + ": " + _this.rawJSON);
                     });
                     _this.scanComplete(results);
