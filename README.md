@@ -4,6 +4,9 @@
 [![Join the chat at https://gitter.im/Johnhhorton/node-nmap](https://badges.gitter.im/Johnhhorton/node-nmap.svg)](https://gitter.im/Johnhhorton/node-nmap?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 NPM package enabling your [NodeJs] application to interface with the features of [NMAP].  This package requires that [NMAP] is installed and available to the running node application.
 
+UPDATE 3.0.4
+* Added extra error handling to detect if NMAP cannot be found a default or passed location.
+
 UPDATE 3.0.3:
 * Added NMAP determined Vendor when a MAC address is provided. Credit: [tbwiss](https://github.com/tbwiss)
 
