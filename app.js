@@ -1,10 +1,10 @@
 var nmap = require('./index');
-var scan = new nmap.nodenmap.QuickScan("192.168.0.1-10");
+var scan = new nmap.nodenmap.OsAndPortScan("192.168.0.1-12");
 //scan.runActionOnError = true;
 //scan.saveErrorsToResults =true;
 console.log('scan starting');
 scan.on('complete', function (data) {
-    console.log(data);
+    console.log(JSON.stringify(data));
     console.log("total scan time" + scan.scanTime);
 });
 scan.on('error', function (data) {

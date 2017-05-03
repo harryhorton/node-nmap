@@ -1,0 +1,427 @@
+/*
+ * NodeJS <-> NMAP interface
+ * Author:  John Horton
+ * Purpose: Create an interface for NodeJS applications to make use of NMAP installed on the local system.
+ */
+
+///<reference path="./typings/node/node.d.ts" />
+const child_process = require('child_process');
+const execSync = child_process.execSync;
+const exec = child_process.exec;
+const spawn = child_process.spawn;
+const fs = require('fs');
+const EventEmitter = require('events').EventEmitter;
+const os = require('os');
+const Queue = require('queued-up');
+const xml2js = require('xml2js');
+
+
+// export module nodenmap {
+//   export interface host {
+//     hostname: string;
+//     ip: string;
+//     mac: any;
+//     openPorts: Array < port > ;
+//     osNmap: string;
+//     scanTime ? : number;
+//     error ? : string;
+//   }
+//   export interface port {
+//     port: number;
+//     service: string;
+//   }
+
+/**
+ * 
+ * @param {*} xmlInput 
+ * @param {*} onFailure 
+ * @returns {host[]} - Array of hosts
+ */
+function convertRawJsonToScanResults(xmlInput) {
+  const tempHostList = [];
+
+  if (!xmlInput.nmaprun.host) {
+    //onFailure("There was a problem with the supplied NMAP XML");
+    return tempHostList;
+  };
+
+  xmlInput = xmlInput.nmaprun.host;
+
+
+  tempHostList = xmlInput.map((host) => {
+    const newHost = {
+      hostname: null,
+      ip: null,
+      mac: null,
+      openPorts: null,
+      osNmap: null
+    }
+
+    //Get hostname
+    if (host.hostnames && host.hostnames[0] !== "\r\n" && host.hostnames[0] !== "\n") {
+      newHost.hostname = host.hostnames[0].hostname[0].$.name
+    }
+
+    //get addresses
+    host.address.forEach((address) => {
+      const addressType = address.$.addrtype
+      const addressAdress = address.$.addr
+      const addressVendor = address.$.vendor
+
+      if (addressType === 'ipv4') {
+        newHost.ip = addressAdress
+      } else if (addressType === 'mac') {
+        newHost.mac = addressAdress
+        newHost.vendor = vendor
+      }
+    })
+
+    //get ports
+    if (host.ports && host.ports[0].port) {
+      const portList = host.ports[0].port
+
+      const openPorts = portList.filter((port) => {
+        return (port.state[0].$.state === 'open')
+      })
+
+      newHost.openPorts = openPorts.map((portItem) => {
+        const port = parseInt(portItem.$.portid)
+        const service = portItem.service[0].$.name
+        return {
+          port: port,
+          service: service
+        }
+      })
+    }
+
+    if(host.os && host.os[0].osmatch && host.os[0].osmatch[0].$.name){
+      newHost.osNmap = host.os[0].osmatch[0].$.name
+    }
+    return newHost
+  })
+
+  return tempHostList;
+}
+
+
+
+class NmapScan extends EventEmitter {
+  constructor(range, inputArguments) {
+    super();
+    this.command = [];
+    this.nmapoutputXML = "";
+    this.timer;
+    this.range = [];
+    this.arguments = ['-oX', '-'];
+    this.rawData = '';
+    this.rawJSON;
+    this.child;
+    this.cancelled = false;
+    this.scanTime = 0;
+    this.error = null;
+    this.scanResults;
+    this.scanTimeout = 0;
+    this.commandConstructor(range, inputArguments);
+    this.initializeChildProcess();
+  }
+  startTimer() {
+    this.timer = setInterval(() => {
+      this.scanTime += 10;
+      if (this.scanTime >= this.scanTimeout && this.scanTimeout !== 0) {
+        this.killChild();
+      }
+    }, 10);
+  }
+  stopTimer() {
+    clearInterval(this.timer);
+  }
+  commandConstructor(range, additionalArguments) {
+    if (additionalArguments) {
+      if (!Array.isArray(additionalArguments)) {
+        additionalArguments = additionalArguments.split(' ');
+      }
+      this.command = this.arguments.concat(additionalArguments);
+    } else {
+      this.command = this.arguments;
+    }
+
+    if (!Array.isArray(range)) {
+      range = range.split(' ');
+    }
+    this.range = range;
+    this.command = this.command.concat(this.range);
+  }
+  killChild() {
+    this.cancelled = true;
+    if (this.child) {
+      this.child.kill();
+
+    }
+  }
+  initializeChildProcess() {
+    this.startTimer();
+    this.child = spawn(nmapLocation, this.command);
+    process.on('SIGINT', this.killChild);
+    process.on('uncaughtException', this.killChild);
+    process.on('exit', this.killChild);
+    this.child.stdout.on("data", (data) => {
+      if (data.indexOf("percent") > -1) {
+        // console.log(data.toString());
+      } else {
+        this.rawData += data;
+      }
+
+    });
+    this.child.on('error', (err) => {
+      this.killChild();
+      if (err.code === 'ENOENT') {
+        this.emit('error', 'NMAP not found at command location: ' + nmapLocation)
+      } else {
+        this.emit('error', err.Error)
+      }
+    })
+
+    this.child.stderr.on("data", (err) => {
+      this.error = err.toString();
+    });
+
+    this.child.on("close", () => {
+      process.removeListener('SIGINT', this.killChild);
+      process.removeListener('uncaughtException', this.killChild);
+      process.removeListener('exit', this.killChild);
+
+      if (this.error) {
+        this.emit('error', this.error);
+      } else if (this.cancelled === true) {
+        this.emit('error', "Over scan timeout " + this.scanTimeout);
+      } else {
+        this.rawDataHandler(this.rawData);
+      }
+    });
+  }
+  startScan() {
+    this.child.stdin.end();
+  }
+  cancelScan() {
+    this.killChild();
+    this.emit('error', "Scan cancelled");
+  }
+  scanComplete(results) {
+    this.scanResults = results;
+    this.stopTimer();
+    this.emit('complete', this.scanResults);
+  }
+  rawDataHandler(data) {
+    var results;
+    //turn NMAP's xml output into a json object
+    xml2js.parseString(data, (err, result) => {
+      if (err) {
+        this.emit('error', "Error converting XML to JSON in xml2js: " + err);
+      } else {
+        this.rawJSON = result;
+        results = convertRawJsonToScanResults(this.rawJSON, (err) => {
+          this.emit('error', "Error converting raw json to cleans can results: " + err + ": " + this.rawJSON);
+        });
+        this.scanComplete(results);
+      }
+    });
+  }
+}
+
+
+
+
+var nmapLocation = "nmap";
+
+class QuickScan extends NmapScan {
+  constructor(range) {
+    super(range, '-sP');
+  }
+}
+class OsAndPortScan extends NmapScan {
+  constructor(range) {
+    super(range, '-O');
+  }
+}
+
+
+export class QueuedScan extends events.EventEmitter {
+  private _queue: Queue;
+  scanResults: host[] = [];
+  scanTime: number = 0;
+  currentScan;
+  runActionOnError: boolean = false;
+  saveErrorsToResults: boolean = false;
+  singleScanTimeout: number = 0;
+  saveNotFoundToResults: boolean = false;
+  constructor(scanClass: any, range: any, args: any[], action: Function = () => {}) {
+    super();
+
+
+    this._queue = new Queue((host) => {
+
+      if (args !== null) {
+        this.currentScan = new scanClass(host, args);
+      } else {
+        this.currentScan = new scanClass(host);
+      }
+      if (this.singleScanTimeout !== 0) {
+        this.currentScan.scanTimeout = this.singleScanTimeout;
+      }
+
+      this.currentScan.on('complete', (data) => {
+        this.scanTime += this.currentScan.scanTime;
+        if (data[0]) {
+          data[0].scanTime = this.currentScan.scanTime;
+          this.scanResults = this.scanResults.concat(data);
+        } else if (this.saveNotFoundToResults) {
+          data[0] = {
+            error: "Host not found",
+            scanTime: this.currentScan.scanTime
+          }
+          this.scanResults = this.scanResults.concat(data);
+
+        }
+
+
+
+        action(data);
+        this._queue.done();
+      });
+      this.currentScan.on('error', (err) => {
+        this.scanTime += this.currentScan.scanTime;
+
+        var data = {
+          error: err,
+          scanTime: this.currentScan.scanTime
+        }
+
+
+        if (this.saveErrorsToResults) {
+          this.scanResults = this.scanResults.concat(data);
+        }
+        if (this.runActionOnError) {
+          action(data);
+        }
+
+        this._queue.done();
+      });
+
+      this.currentScan.startScan();
+    });
+
+    this._queue.add(this.rangeFormatter(range));
+
+    this._queue.on('complete', () => {
+      this.emit('complete', this.scanResults);
+
+    });
+  }
+
+  private rangeFormatter(range) {
+    var outputRange = [];
+    if (!Array.isArray(range)) {
+      range = range.split(' ');
+    }
+
+    for (var i = 0; i < range.length; i++) {
+      var input = range[i];
+      var temprange = range[i];
+      if (countCharacterOccurence(input, ".") === 3 &&
+        input.match(new RegExp("-", "g")) !== null &&
+        !input.match(/^[a-zA-Z]+$/) &&
+        input.match(new RegExp("-", "g")).length === 1
+      ) {
+        var firstIP = input.slice(0, input.indexOf("-"));
+        var network;
+        var lastNumber = input.slice(input.indexOf("-") + 1);
+        var firstNumber;
+        var newRange = [];
+        for (var j = firstIP.length - 1; j > -1; j--) {
+          if (firstIP.charAt(j) === ".") {
+            firstNumber = firstIP.slice(j + 1);
+            network = firstIP.slice(0, j + 1);
+            break;
+          }
+        }
+        for (var iter = firstNumber; iter <= lastNumber; iter++) {
+          newRange.push(network + iter);
+        }
+        //replace the range/host string with array
+        temprange = newRange;
+      }
+      outputRange = outputRange.concat(temprange);
+    }
+
+    function countCharacterOccurence(input, character) {
+      var num = 0;
+      for (var k = 0; k < input.length; k++) {
+        if (input.charAt(k) === character) {
+          num++;
+        }
+      }
+      return num;
+    }
+    return outputRange;
+  }
+  startRunScan(index: number = 0) {
+    this.scanResults = [];
+    this._queue.run(0);
+  }
+  startShiftScan() {
+    this.scanResults = [];
+    this._queue.shiftRun();
+  }
+  pause() {
+    this._queue.pause();
+  }
+  resume() {
+    this._queue.resume();
+  }
+  next(iterations: number = 1) {
+    return this._queue.next(iterations);
+  }
+  shift(iterations: number = 1) {
+    return this._queue.shift(iterations);
+  }
+  results() {
+    return this.scanResults;
+  }
+  shiftResults() {
+    this._queue.shiftResults();
+    return this.scanResults.shift();
+  }
+  index() {
+    return this._queue.index();
+  }
+  queue(newQueue ? : any[]): any[] {
+
+    if (Array.isArray(newQueue)) {
+      return this._queue.queue(newQueue);
+
+    } else {
+      return this._queue.queue();
+    }
+  }
+  percentComplete() {
+    return Math.round(((this._queue.index() + 1) / this._queue.queue().length) * 100);
+  }
+}
+export class QueuedNmapScan extends QueuedScan {
+  constructor(range: any, additionalArguments ? : any, actionFunction: Function = () => {}) {
+    super(NmapScan, range, additionalArguments, actionFunction);
+  }
+}
+export class QueuedQuickScan extends QueuedScan {
+  constructor(range: any, actionFunction: Function = () => {}) {
+    super(QuickScan, range, null, actionFunction);
+  }
+}
+export class QueuedOsAndPortScan extends QueuedScan {
+  constructor(range: any, actionFunction: Function = () => {}) {
+    super(OsAndPortScan, range, null, actionFunction);
+  }
+}
+}
+
+exports = nodenmap;
