@@ -16,10 +16,6 @@
     "network",
     "scan"
   ],
-  "typing": [
-    "./index.d.ts",
-    "./typings/node/node.d.ts"
-  ],
   "author": "John H Horton",
   "license": "MIT",
   "bugs": {

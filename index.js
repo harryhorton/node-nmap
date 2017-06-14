@@ -4,7 +4,6 @@
  * Purpose: Create an interface for NodeJS applications to make use of NMAP installed on the local system.
  */
 
-///<reference path="./typings/node/node.d.ts" />
 const child_process = require('child_process');
 const execSync = child_process.execSync;
 const exec = child_process.exec;
@@ -87,7 +86,6 @@ function convertRawJsonToScanResults(xmlInput) {
 
   return tempHostList;
 }
-
 
 
 class NmapScan extends EventEmitter {

@@ -1,7 +1,7 @@
 var should = require('chai').should(),
   assert = require('assert'),
   expect = require('chai').expect,
-  nmap = require('../node-nmap');
+  nmap = require('../index');
 
 
 describe('NmapScan', function() {
