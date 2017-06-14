@@ -16,21 +16,6 @@ const Queue = require('queued-up');
 const xml2js = require('xml2js');
 
 
-// export module nodenmap {
-//   export interface host {
-//     hostname: string;
-//     ip: string;
-//     mac: any;
-//     openPorts: Array < port > ;
-//     osNmap: string;
-//     scanTime ? : number;
-//     error ? : string;
-//   }
-//   export interface port {
-//     port: number;
-//     service: string;
-//   }
-
 /**
  * 
  * @param {*} xmlInput 
@@ -84,7 +69,7 @@ function convertRawJsonToScanResults(xmlInput) {
       })
 
       newHost.openPorts = openPorts.map((portItem) => {
-        console.log(JSON.stringify(portItem, null, 4))
+        // console.log(JSON.stringify(portItem, null, 4))
         const port = parseInt(portItem.$.portid)
         const service = portItem.service[0].$.name
         return {
