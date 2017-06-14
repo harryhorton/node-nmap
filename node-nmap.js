@@ -38,7 +38,7 @@ const xml2js = require('xml2js');
  * @returns {host[]} - Array of hosts
  */
 function convertRawJsonToScanResults(xmlInput) {
-  const tempHostList = [];
+  let tempHostList = [];
 
   if (!xmlInput.nmaprun.host) {
     //onFailure("There was a problem with the supplied NMAP XML");
@@ -46,7 +46,6 @@ function convertRawJsonToScanResults(xmlInput) {
   };
 
   xmlInput = xmlInput.nmaprun.host;
-
 
   tempHostList = xmlInput.map((host) => {
     const newHost = {
@@ -72,7 +71,7 @@ function convertRawJsonToScanResults(xmlInput) {
         newHost.ip = addressAdress
       } else if (addressType === 'mac') {
         newHost.mac = addressAdress
-        newHost.vendor = vendor
+        newHost.vendor = addressVendor
       }
     })
 
@@ -85,6 +84,7 @@ function convertRawJsonToScanResults(xmlInput) {
       })
 
       newHost.openPorts = openPorts.map((portItem) => {
+        console.log(JSON.stringify(portItem, null, 4))
         const port = parseInt(portItem.$.portid)
         const service = portItem.service[0].$.name
         return {
@@ -94,7 +94,7 @@ function convertRawJsonToScanResults(xmlInput) {
       })
     }
 
-    if(host.os && host.os[0].osmatch && host.os[0].osmatch[0].$.name){
+    if (host.os && host.os[0].osmatch && host.os[0].osmatch[0].$.name) {
       newHost.osNmap = host.os[0].osmatch[0].$.name
     }
     return newHost
@@ -124,6 +124,7 @@ class NmapScan extends EventEmitter {
     this.commandConstructor(range, inputArguments);
     this.initializeChildProcess();
   }
+
   startTimer() {
     this.timer = setInterval(() => {
       this.scanTime += 10;
@@ -132,9 +133,11 @@ class NmapScan extends EventEmitter {
       }
     }, 10);
   }
+
   stopTimer() {
     clearInterval(this.timer);
   }
+
   commandConstructor(range, additionalArguments) {
     if (additionalArguments) {
       if (!Array.isArray(additionalArguments)) {
@@ -151,6 +154,7 @@ class NmapScan extends EventEmitter {
     this.range = range;
     this.command = this.command.concat(this.range);
   }
+
   killChild() {
     this.cancelled = true;
     if (this.child) {
@@ -158,9 +162,10 @@ class NmapScan extends EventEmitter {
 
     }
   }
+
   initializeChildProcess() {
     this.startTimer();
-    this.child = spawn(nmapLocation, this.command);
+    this.child = spawn(nmap.nmapLocation, this.command);
     process.on('SIGINT', this.killChild);
     process.on('uncaughtException', this.killChild);
     process.on('exit', this.killChild);
@@ -172,10 +177,11 @@ class NmapScan extends EventEmitter {
       }
 
     });
+
     this.child.on('error', (err) => {
       this.killChild();
       if (err.code === 'ENOENT') {
-        this.emit('error', 'NMAP not found at command location: ' + nmapLocation)
+        this.emit('error', 'NMAP not found at command location: ' + nmap.nmapLocation)
       } else {
         this.emit('error', err.Error)
       }
@@ -199,20 +205,24 @@ class NmapScan extends EventEmitter {
       }
     });
   }
+
   startScan() {
     this.child.stdin.end();
   }
+
   cancelScan() {
     this.killChild();
     this.emit('error', "Scan cancelled");
   }
+
   scanComplete(results) {
     this.scanResults = results;
     this.stopTimer();
     this.emit('complete', this.scanResults);
   }
+
   rawDataHandler(data) {
-    var results;
+    let results;
     //turn NMAP's xml output into a json object
     xml2js.parseString(data, (err, result) => {
       if (err) {
@@ -229,10 +239,6 @@ class NmapScan extends EventEmitter {
 }
 
 
-
-
-var nmapLocation = "nmap";
-
 class QuickScan extends NmapScan {
   constructor(range) {
     super(range, '-sP');
@@ -245,18 +251,17 @@ class OsAndPortScan extends NmapScan {
 }
 
 
-export class QueuedScan extends events.EventEmitter {
-  private _queue: Queue;
-  scanResults: host[] = [];
-  scanTime: number = 0;
-  currentScan;
-  runActionOnError: boolean = false;
-  saveErrorsToResults: boolean = false;
-  singleScanTimeout: number = 0;
-  saveNotFoundToResults: boolean = false;
-  constructor(scanClass: any, range: any, args: any[], action: Function = () => {}) {
-    super();
+class QueuedScan extends EventEmitter {
 
+  constructor(scanClass, range, args, action = () => {}) {
+    super();
+    this.scanResults = [];
+    this.scanTime = 0;
+    this.currentScan;
+    this.runActionOnError = false;
+    this.saveErrorsToResults = false;
+    this.singleScanTimeout = 0;
+    this.saveNotFoundToResults = false;
 
     this._queue = new Queue((host) => {
 
@@ -282,16 +287,14 @@ export class QueuedScan extends events.EventEmitter {
           this.scanResults = this.scanResults.concat(data);
 
         }
-
-
-
         action(data);
         this._queue.done();
       });
+
       this.currentScan.on('error', (err) => {
         this.scanTime += this.currentScan.scanTime;
 
-        var data = {
+        let data = {
           error: err,
           scanTime: this.currentScan.scanTime
         }
@@ -318,33 +321,33 @@ export class QueuedScan extends events.EventEmitter {
     });
   }
 
-  private rangeFormatter(range) {
-    var outputRange = [];
+  rangeFormatter(range) {
+    let outputRange = [];
     if (!Array.isArray(range)) {
       range = range.split(' ');
     }
 
-    for (var i = 0; i < range.length; i++) {
-      var input = range[i];
-      var temprange = range[i];
+    for (let i = 0; i < range.length; i++) {
+      let input = range[i];
+      let temprange = range[i];
       if (countCharacterOccurence(input, ".") === 3 &&
         input.match(new RegExp("-", "g")) !== null &&
         !input.match(/^[a-zA-Z]+$/) &&
         input.match(new RegExp("-", "g")).length === 1
       ) {
-        var firstIP = input.slice(0, input.indexOf("-"));
-        var network;
-        var lastNumber = input.slice(input.indexOf("-") + 1);
-        var firstNumber;
-        var newRange = [];
-        for (var j = firstIP.length - 1; j > -1; j--) {
+        let firstIP = input.slice(0, input.indexOf("-"));
+        let network;
+        let lastNumber = input.slice(input.indexOf("-") + 1);
+        let firstNumber;
+        let newRange = [];
+        for (let j = firstIP.length - 1; j > -1; j--) {
           if (firstIP.charAt(j) === ".") {
             firstNumber = firstIP.slice(j + 1);
             network = firstIP.slice(0, j + 1);
             break;
           }
         }
-        for (var iter = firstNumber; iter <= lastNumber; iter++) {
+        for (let iter = firstNumber; iter <= lastNumber; iter++) {
           newRange.push(network + iter);
         }
         //replace the range/host string with array
@@ -354,8 +357,8 @@ export class QueuedScan extends events.EventEmitter {
     }
 
     function countCharacterOccurence(input, character) {
-      var num = 0;
-      for (var k = 0; k < input.length; k++) {
+      let num = 0;
+      for (let k = 0; k < input.length; k++) {
         if (input.charAt(k) === character) {
           num++;
         }
@@ -364,37 +367,47 @@ export class QueuedScan extends events.EventEmitter {
     }
     return outputRange;
   }
-  startRunScan(index: number = 0) {
+
+  startRunScan(index = 0) {
     this.scanResults = [];
     this._queue.run(0);
   }
+
   startShiftScan() {
     this.scanResults = [];
     this._queue.shiftRun();
   }
+
   pause() {
     this._queue.pause();
   }
+
   resume() {
     this._queue.resume();
   }
-  next(iterations: number = 1) {
+
+  next(iterations = 1) {
     return this._queue.next(iterations);
   }
-  shift(iterations: number = 1) {
+
+  shift(iterations = 1) {
     return this._queue.shift(iterations);
   }
+
   results() {
     return this.scanResults;
   }
+
   shiftResults() {
     this._queue.shiftResults();
     return this.scanResults.shift();
   }
+
   index() {
     return this._queue.index();
   }
-  queue(newQueue ? : any[]): any[] {
+
+  queue(newQueue) {
 
     if (Array.isArray(newQueue)) {
       return this._queue.queue(newQueue);
@@ -403,25 +416,39 @@ export class QueuedScan extends events.EventEmitter {
       return this._queue.queue();
     }
   }
+
   percentComplete() {
     return Math.round(((this._queue.index() + 1) / this._queue.queue().length) * 100);
   }
 }
-export class QueuedNmapScan extends QueuedScan {
-  constructor(range: any, additionalArguments ? : any, actionFunction: Function = () => {}) {
+
+class QueuedNmapScan extends QueuedScan {
+  constructor(range, additionalArguments, actionFunction = () => {}) {
     super(NmapScan, range, additionalArguments, actionFunction);
   }
 }
-export class QueuedQuickScan extends QueuedScan {
-  constructor(range: any, actionFunction: Function = () => {}) {
+
+class QueuedQuickScan extends QueuedScan {
+  constructor(range, actionFunction = () => {}) {
     super(QuickScan, range, null, actionFunction);
   }
 }
-export class QueuedOsAndPortScan extends QueuedScan {
-  constructor(range: any, actionFunction: Function = () => {}) {
+
+class QueuedOsAndPortScan extends QueuedScan {
+  constructor(range, actionFunction = () => {}) {
     super(OsAndPortScan, range, null, actionFunction);
   }
 }
+
+let nmap = {
+  nmapLocation: "nmap",
+  NmapScan,
+  QuickScan,
+  OsAndPortScan,
+  QueuedScan,
+  QueuedNmapScan,
+  QueuedQuickScan,
+  QueuedOsAndPortScan
 }
 
-exports = nodenmap;
+module.exports = nmap;

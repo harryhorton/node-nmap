@@ -1,16 +1,16 @@
 var should = require('chai').should(),
   assert = require('assert'),
   expect = require('chai').expect,
-nmap = require('../index');
+  nmap = require('../node-nmap');
 
 
-describe('NmapScan', function () {
+describe('NmapScan', function() {
 
-  it('runs NMAP', function (done) {
+  it('runs NMAP', function(done) {
 
     this.timeout(10000);
-    var scan = new nmap.nodenmap.NmapScan("google.com");
-    scan.on('complete', function (data) {
+    var scan = new nmap.NmapScan("google.com");
+    scan.on('complete', function(data) {
       expect(data).to.be.instanceOf(Array);
       expect(data).to.not.be.empty;
       expect(data[0]).to.include.keys('hostname', 'ip', 'mac', 'openPorts', 'osNmap');
@@ -19,11 +19,11 @@ describe('NmapScan', function () {
     scan.startScan();
   });
 
-  it('accepts space separated command', function (done) {
+  it('accepts space separated command', function(done) {
 
     this.timeout(10000);
-    var scan = new nmap.nodenmap.NmapScan("-sn 127.0.0.1");
-    scan.on('complete', function (data) {
+    var scan = new nmap.NmapScan("-sn 127.0.0.1");
+    scan.on('complete', function(data) {
 
       expect(data).to.be.instanceOf(Array);
       expect(data).to.not.be.empty;
@@ -33,11 +33,11 @@ describe('NmapScan', function () {
     scan.startScan();
   });
 
-  it('accepts multiple hosts', function (done) {
+  it('accepts multiple hosts', function(done) {
 
     this.timeout(10000);
-    var scan = new nmap.nodenmap.NmapScan("-sn 127.0.0.1 google.com");
-    scan.on('complete', function (data) {
+    var scan = new nmap.NmapScan("-sn 127.0.0.1 google.com");
+    scan.on('complete', function(data) {
 
       expect(data).to.be.instanceOf(Array);
       expect(data).to.not.be.empty;
@@ -46,11 +46,11 @@ describe('NmapScan', function () {
     });
     scan.startScan();
   });
-  it('returns failure data for bad requests', function (done) {
+  it('returns failure data for bad requests', function(done) {
 
     this.timeout(10000);
-    var scan = new nmap.nodenmap.NmapScan("127.0.0.");
-    scan.on('error', function (err) {
+    var scan = new nmap.NmapScan("127.0.0.");
+    scan.on('error', function(err) {
       expect(err).to.be.a('string');
       done();
     });
@@ -59,13 +59,13 @@ describe('NmapScan', function () {
 
 });
 
-describe('quickScan', function () {
+describe('quickScan', function() {
 
-  it('scans range of hosts', function (done) {
+  it('scans range of hosts', function(done) {
 
     this.timeout(10000);
-    var scan = new nmap.nodenmap.QuickScan("127.0.0.1 google.com");
-    scan.on('complete', function (data) {
+    var scan = new nmap.QuickScan("127.0.0.1 google.com");
+    scan.on('complete', function(data) {
 
       expect(data).to.be.instanceOf(Array);
       expect(data).to.not.be.empty;
@@ -75,11 +75,11 @@ describe('quickScan', function () {
     });
     scan.startScan();
   });
-  it('returns failure data for bad requests', function (done) {
+  it('returns failure data for bad requests', function(done) {
 
     this.timeout(10000);
-    var scan = new nmap.nodenmap.QuickScan("127.0.0.");
-    scan.on('error', function (err) {
+    var scan = new nmap.QuickScan("127.0.0.");
+    scan.on('error', function(err) {
       expect(err).to.be.a('string');
       done();
     });
@@ -89,13 +89,13 @@ describe('quickScan', function () {
 
 });
 
-describe('osAndPortScan', function () {
+describe('osAndPortScan', function() {
 
-  it('scans hosts for open ports and OS data', function (done) {
+  it('scans hosts for open ports and OS data', function(done) {
 
     this.timeout(20000);
-    var scan = new nmap.nodenmap.OsAndPortScan("google.com");
-    scan.on('complete', function (data) {
+    var scan = new nmap.OsAndPortScan("google.com");
+    scan.on('complete', function(data) {
       expect(data).to.be.instanceOf(Array);
       expect(data).to.not.be.empty;
       expect(data[0]).to.include.keys('hostname', 'ip', 'mac', 'openPorts', 'osNmap');
@@ -106,11 +106,11 @@ describe('osAndPortScan', function () {
     });
     scan.startScan();
   });
-  it('returns failure data for bad requests', function (done) {
+  it('returns failure data for bad requests', function(done) {
 
     this.timeout(10000);
-    var scan = new nmap.nodenmap.OsAndPortScan("127.0.0.");
-    scan.on('error', function (err) {
+    var scan = new nmap.OsAndPortScan("127.0.0.");
+    scan.on('error', function(err) {
       expect(err).to.be.a('string');
       done();
     });
