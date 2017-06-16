@@ -7,6 +7,7 @@ NPM package enabling your [NodeJs] application to interface with the features of
 UPDATE 4.0.0
 * Changed the code base from TypeScript to pure ES6
 * Removed TypeScript and TS types
+* Added additional port service information to output if available (-sV)
 * BREAKING - Changed export method to flat object, upgrade instructions below.
 
 Upgrade instructions:
