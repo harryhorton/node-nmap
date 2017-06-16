@@ -1,5 +1,5 @@
-var nmap = require('./node-nmap');
-var scan = new nmap.OsAndPortScan("192.168.0.1-12");
+var nmap = require('./index');
+var scan = new nmap.NmapScan("google.com", "-sV");
 //scan.runActionOnError = true;
 //scan.saveErrorsToResults =true;
 console.log('scan starting');
