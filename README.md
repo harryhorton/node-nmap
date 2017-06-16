@@ -4,6 +4,29 @@
 [![Join the chat at https://gitter.im/Johnhhorton/node-nmap](https://badges.gitter.im/Johnhhorton/node-nmap.svg)](https://gitter.im/Johnhhorton/node-nmap?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 NPM package enabling your [NodeJs] application to interface with the features of [NMAP].  This package requires that [NMAP] is installed and available to the running node application.
 
+UPDATE 4.0.0
+* Changed the code base from TypeScript to pure ES6
+* Removed TypeScript and TS types
+* BREAKING - Changed export method to flat object, upgrade instructions below.
+
+Upgrade instructions:
+
+```javascript
+//Previous usage 3.0.4 and below
+const nmap = require('node-nmap');
+nmap.nodenmap.nmapLocation = "nmap"; //default
+let quickscan = new nmap.nodenmap.QuickScan('127.0.0.1 google.com');
+
+/*4.0.0+ usage simply removes a layer of object nesting.
+* simply remove 'nodenmap'
+*/
+const nmap = require('node-nmap');
+nmap.nmapLocation = 'nmap'; //default
+let quickscan = new nmap.QuickScan('127.0.0.1 google.com');
+
+```
+
+
 UPDATE 3.0.4
 * Added extra error handling to detect if NMAP cannot be found a default or passed location.
 
@@ -93,10 +116,10 @@ The return structure is:
 ```javascript
 var nmap = require('node-nmap');
 
-nmap.nodenmap.nmapLocation = "nmap"; //default
+nmap.nmapLocation = "nmap"; //default
 
 //    Accepts array or comma separated string of NMAP acceptable hosts
-var quickscan = new nmap.nodenmap.QuickScan('127.0.0.1 google.com');
+var quickscan = new nmap.QuickScan('127.0.0.1 google.com');
 
 quickscan.on('complete', function(data){
   console.log(data);
@@ -131,7 +154,7 @@ quickscan.startScan();
 
 
 //    Accepts array or comma separarted string for custom nmap commands in the second argument.
-var nmapscan = new nmap.nodenmap.NmapScan('127.0.0.1 google.com', '-sn');
+var nmapscan = new nmap.NmapScan('127.0.0.1 google.com', '-sn');
 
 nmapscan.on('complete',function(data){
   console.log(data);
@@ -163,7 +186,7 @@ nmapscan.startScan();
 //       "osNmap":null
 //    }
 // ]
-var osandports = new nmap.nodenmap.OsAndPortScan('google.com');
+var osandports = new nmap.OsAndPortScan('google.com');
 
 osandports.on('complete',function(data){
   console.log(data);
@@ -212,7 +235,7 @@ function actionFunction(data){
     console.log(data);
 	console.log("Percentage complete" + scan.percentComplete());
 }
-var scan = new nmap.nodenmap.QueuedOsAndPortScan("google.com 192.168.0.1-10", actionFunction);
+var scan = new nmap.QueuedOsAndPortScan("google.com 192.168.0.1-10", actionFunction);
 
 scan.on('complete', function(data){
 	console.log(data);
