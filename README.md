@@ -41,11 +41,11 @@ UPDATE v3: A lot of changes have come in this update:
 * Added `scan.cancelScan()` to kill a running scan
 * Removed `autoDiscover` scan type until method of determining useful interfaces found
 * Bugfix: Now remove listeners for SIGINT when a scan is complete.
-* Added a Queued version of each scan allowing for a highler level of feedback and control over the scanning process.
+* Added a Queued version of each scan allowing for a higher level of feedback and control over the scanning process.
 * Building against the latest version of NMAP (v7)
 
 UPDATE v2: I have rewritten the module in TypeScript.  the .d.ts file is located at /node_modules/node-nmap/index.d.ts.
-As a part of this update, there is an additional maping for the namespace/module, as well as a requirement to use `new` for each scan.
+As a part of this update, there is an additional mapping for the namespace/module, as well as a requirement to use `new` for each scan.
 
 Request:  While `NmapScan()` will accept valid NMAP arguments, the XML to JSON conversion is only checking for specific things.  If there is a common or useful NMAP feature that you would like to see included, please submit an issue and I will work it in.
 
@@ -76,7 +76,7 @@ Request:  While `NmapScan()` will accept valid NMAP arguments, the XML to JSON c
 * `currentScan` - reference to the current scan object if needed
 * `runActiononError` : boolean(default:false) - run the supplied action function when an error is encountered.
 * `saveErrorsToResults` : boolean(default:false) - save error data to the results array
-* `singleScanTimeout` : number in ms - timeout value to be supplied to eachs single scan.
+* `singleScanTimeout` : number in ms - timeout value to be supplied to each single scan.
 * `saveNotFoundToResults` : boolean(default:false) - save host not found error object to results array
 * `startRunScan()` - begins processing the entire queue without removing scanned hosts.
 * `startShiftScan()` - begins processing entire queue while removing scanned hosts.
@@ -154,7 +154,7 @@ quickscan.startScan();
 // ]
 
 
-//    Accepts array or comma separarted string for custom nmap commands in the second argument.
+//    Accepts array or comma separated string for custom nmap commands in the second argument.
 var nmapscan = new nmap.NmapScan('127.0.0.1 google.com', '-sn');
 
 nmapscan.on('complete',function(data){
