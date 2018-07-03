@@ -191,8 +191,10 @@ class NmapScan extends EventEmitter {
       process.removeListener('exit', this.killChild);
 
       if (this.error) {
+        this.stopTimer();
         this.emit('error', this.error);
       } else if (this.cancelled === true) {
+        this.stopTimer();
         this.emit('error', "Over scan timeout " + this.scanTimeout);
       } else {
         this.rawDataHandler(this.rawData);
@@ -220,6 +222,7 @@ class NmapScan extends EventEmitter {
     //turn NMAP's xml output into a json object
     xml2js.parseString(data, (err, result) => {
       if (err) {
+        this.stopTimer();
         this.emit('error', "Error converting XML to JSON in xml2js: " + err);
       } else {
         this.rawJSON = result;
