@@ -16,9 +16,9 @@ const xml2js = require('xml2js');
 
 
 /**
- * 
- * @param {*} xmlInput 
- * @param {*} onFailure 
+ *
+ * @param {*} xmlInput
+ * @param {*} onFailure
  * @returns {host[]} - Array of hosts
  */
 function convertRawJsonToScanResults(xmlInput) {
@@ -72,18 +72,24 @@ function convertRawJsonToScanResults(xmlInput) {
 
         const port = parseInt(portItem.$.portid)
         const protocol = portItem.$.protocol
-        const service = portItem.service[0].$.name
-        const tunnel = portItem.service[0].$.tunnel
-        const method = portItem.service[0].$.method
-        const product = portItem.service[0].$.tunnel
+
+        if (portItem.service) {
+          const service = portItem.service[0].$.name
+          const tunnel = portItem.service[0].$.tunnel
+          const method = portItem.service[0].$.method
+          const product = portItem.service[0].$.tunnel
+        }
 
         let portObject = {}
         if(port) portObject.port = port
         if(protocol) portObject.protocol = protocol
-        if(service) portObject.service = service
-        if(tunnel) portObject.tunnel = tunnel
-        if(method) portObject.method = method
-        if(product) portObject.product = product
+
+        if (portItem.service) {
+          if(service) portObject.service = service
+          if(tunnel) portObject.tunnel = tunnel
+          if(method) portObject.method = method
+          if(product) portObject.product = product
+        }
 
         return portObject
       })
