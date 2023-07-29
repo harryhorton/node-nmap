@@ -73,22 +73,22 @@ function convertRawJsonToScanResults(xmlInput) {
         const port = parseInt(portItem.$.portid)
         const protocol = portItem.$.protocol
 
-        if (portItem.service) {
-          const service = portItem.service[0].$.name
-          const tunnel = portItem.service[0].$.tunnel
-          const method = portItem.service[0].$.method
-          const product = portItem.service[0].$.tunnel
-        }
-
         let portObject = {}
         if(port) portObject.port = port
         if(protocol) portObject.protocol = protocol
 
         if (portItem.service) {
+          const service = portItem.service[0].$.name
+          const tunnel = portItem.service[0].$.tunnel
+          const method = portItem.service[0].$.method
+          const product = portItem.service[0].$.product
+          const version = portItem.service[0].$.version
+
           if(service) portObject.service = service
           if(tunnel) portObject.tunnel = tunnel
           if(method) portObject.method = method
           if(product) portObject.product = product
+          if(version) portObject.version = version
         }
 
         return portObject
