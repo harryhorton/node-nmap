@@ -78,6 +78,7 @@ function convertRawJsonToScanResults(xmlInput) {
           const tunnel = portItem.service[0].$.tunnel
           const method = portItem.service[0].$.method
           const product = portItem.service[0].$.product
+          const version = portItem.service[0].$.version
         }
 
         let portObject = {}
@@ -89,6 +90,7 @@ function convertRawJsonToScanResults(xmlInput) {
           if(tunnel) portObject.tunnel = tunnel
           if(method) portObject.method = method
           if(product) portObject.product = product
+          if(version) portObject.version = version
         }
 
         return portObject
